@@ -356,7 +356,7 @@ def _hl_card(entry: dict | None) -> str:
         for p in positions:
             side = "多" if p.get("side") == 1 else ("空" if p.get("side") == -1 else "—")
             rows.append(
-                f"<tr><td>{esc(p.get('coin'))} {side} ×{esc(p.get('leverage'))}</td>"
+                f"<tr><td>{esc(p.get('coin'))} {side}</td>"
                 f"<td>{_fmt_money(p.get('size'))}</td>"
                 f"<td>{_fmt_money(p.get('entry_px'))}</td>"
                 f"<td>{_fmt_money(p.get('mark_px'))}</td>"
