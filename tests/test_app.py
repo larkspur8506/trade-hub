@@ -81,6 +81,25 @@ class SummaryShapeTests(unittest.TestCase):
         self.assertTrue(body["hl"]["stale"])
 
 
+class StaticAssetsTests(unittest.TestCase):
+    def test_icon_and_manifest_routes(self):
+        client, _ = _client()
+        for path, ctype in (
+            ("/apple-touch-icon.png", "image/png"),
+            ("/favicon-32.png", "image/png"),
+            ("/favicon.ico", "image/png"),
+            ("/icon-192.png", "image/png"),
+            ("/icon-512.png", "image/png"),
+            ("/manifest.webmanifest", "application/manifest+json"),
+        ):
+            r = client.get(path)
+            self.assertEqual(r.status_code, 200, path)
+            self.assertEqual(r.headers["content-type"], ctype, path)
+        m = client.get("/manifest.webmanifest").json()
+        self.assertEqual(m["short_name"], "trade-hub")
+        self.assertTrue(any(i["src"] == "/icon-512.png" for i in m["icons"]))
+
+
 class ConfigTests(unittest.TestCase):
     def test_missing_required_env_fails(self):
         from app.config import Config as C

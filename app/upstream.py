@@ -94,6 +94,7 @@ def normalize_hl(status: dict) -> dict:
         "agent_level": (status.get("agent") or {}).get("level"),
         "feed_ok": (all(f.get("ok") for f in feed) if feed else None),
         "mismatch": (status.get("system") or {}).get("mismatch"),
+        "last_event_ts": (status.get("system") or {}).get("executor_last_event_at"),
         "panel_ts": status.get("ts"),
     }
 
@@ -137,6 +138,7 @@ def normalize_lt(
             "min_dense_bars": s.get("min_dense_bars"),
             "verdict": s.get("verdict"),
             "reason": s.get("reason"),
+            "held_side": s.get("held_side"),
         }
         for s in (symbols or {}).get("symbols") or []
     ]

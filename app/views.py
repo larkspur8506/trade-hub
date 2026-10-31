@@ -2,6 +2,11 @@
 
 Theme follows the system (dark default + prefers-color-scheme light), same
 convention as the two source panels — no theme toggle by design.
+
+The two system cards share one visual language: identical status-line order
+(模式 · kill · 止损 · tick 新鲜度, then system-specific extras), identical
+positions-table columns, and the same ✔/⚠ markers for stop coverage — so a
+glance compares the two systems without re-learning the layout.
 """
 from __future__ import annotations
 
@@ -36,9 +41,12 @@ header .gen{font-size:12px;color:var(--dim)}
 .pos td{text-align:right;padding:4px;font-family:var(--mono);border-bottom:1px solid var(--line)}
 .pos th:first-child,.pos td:first-child{text-align:left}
 .pos td:first-child{font-family:inherit}
+.pos .mark{color:var(--ok)}
+.pos .miss{color:var(--bad)}
 .sym{font-size:13px;padding:5px 0;border-bottom:1px solid var(--line)}
 .sym:last-child{border-bottom:none}
 .sym .v{color:var(--dim)}
+.sym .mark{color:var(--accent)}
 .ev{font-size:12px;color:var(--dim);padding:3px 0;overflow-wrap:anywhere}
 .ev .t{font-family:var(--mono);margin-right:6px}
 .banner{font-size:12px;border-radius:6px;padding:6px 8px;margin:6px 0}
@@ -50,6 +58,12 @@ header .gen{font-size:12px;color:var(--dim)}
 """
 
 _JS = "try{if(location.search.indexOf('k=')>-1){history.replaceState(null,'',location.pathname)}}catch(e){}"
+
+_HEAD_LINKS = (
+    "<link rel='apple-touch-icon' href='/apple-touch-icon.png'>"
+    "<link rel='icon' type='image/png' href='/favicon-32.png'>"
+    "<link rel='manifest' href='/manifest.webmanifest'>"
+)
 
 
 def esc(v) -> str:
@@ -121,70 +135,76 @@ def _dot_class(entry: dict | None) -> str:
     return "ok"
 
 
-def _hl_card(entry: dict | None) -> str:
-    head = '<div class="card"><h2><span class="dot {cls}"></span>Hyperliquid</h2>{body}</div>'
-    if entry is None:
-        return head.format(cls="warn", body='<div class="init">等待第一轮拉取…</div>')
-    if not entry.get("ok"):
-        return head.format(
-            cls="bad",
-            body=f'<div class="banner err">不可用：{esc(entry.get("error"))}</div>',
-        )
-    d = entry.get("data") or {}
-    body: list[str] = []
-    if entry.get("stale"):
-        body.append(f'<div class="banner warn">数据 {_fmt_age(entry.get("age_s"))}未刷新</div>')
-    bits = [f"模式 {esc(d.get('mode') or '—')}"]
-    if d.get("kill"):
-        bits.append(f'<span style="color:var(--bad)">已 kill（{esc(d.get("kill_reason"))}）</span>')
-    if d.get("feed_ok") is False:
-        bits.append('<span style="color:var(--warn)">数据源异常</span>')
-    if d.get("agent_days_left") is not None:
-        bits.append(f"API 剩 {esc(d['agent_days_left'])} 天")
-    body.append(f'<div class="sub">{" · ".join(bits)}</div>')
-    body.append(
-        f'<div class="big">权益 {_fmt_money(d.get("equity"))} U'
-        f'<span class="upnl">浮盈 {_fmt_signed(d.get("unrealized_pnl"))} U</span></div>'
+def _held_text(side) -> str | None:
+    """持仓方向标记：HL position_side 用 "long"/"short"，LT held_side 用 1/-1。"""
+    if side in (1, "1"):
+        return "多"
+    if side in (-1, "-1", "short"):
+        return "空"
+    if side == "long":
+        return "多"
+    return None
+
+
+def _stop_cell(covered: bool, price) -> str:
+    """Unified stop cell: price + ✔ when covered, red 无 when absent."""
+    if covered:
+        return f"{_fmt_money(price)} <span class='mark'>✔</span>"
+    return "<span class='miss'>无</span>"
+
+
+def _sub_line(bits: list[str]) -> str:
+    parts = [b for b in bits if b]
+    return f'<div class="sub">{" · ".join(parts)}</div>' if parts else ""
+
+
+def _equity_line(equity, upnl) -> str:
+    upnl_html = ""
+    if upnl is not None:
+        upnl_html = f'<span class="upnl">浮盈 {_fmt_signed(upnl)} U</span>'
+    return f'<div class="big">权益 {_fmt_money(equity)} U{upnl_html}</div>'
+
+
+def _positions_table(rows: list[str]) -> str:
+    return (
+        '<table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>浮盈U</th><th>止损</th></tr>'
+        + "".join(rows)
+        + "</table>"
     )
-    if d.get("positions"):
-        rows = []
-        for p in d["positions"]:
-            side = "多" if p.get("side") == 1 else ("空" if p.get("side") == -1 else "—")
-            stop = f'{_fmt_money(p.get("stop_px"))} ✔' if p.get("has_stop") else '<span style="color:var(--bad)">无</span>'
-            rows.append(
-                f"<tr><td>{esc(p.get('coin'))} {side} ×{esc(p.get('leverage'))}</td>"
-                f"<td>{_fmt_money(p.get('size'))}</td>"
-                f"<td>{_fmt_money(p.get('entry_px'))}</td>"
-                f"<td>{_fmt_money(p.get('mark_px'))}</td>"
-                f"<td>{_fmt_signed(p.get('unrealized_pnl'))}</td>"
-                f"<td>{stop}</td></tr>"
-            )
-        body.append(
-            '<table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>浮盈U</th><th>止损</th></tr>'
-            + "".join(rows)
-            + "</table>"
-        )
-    else:
-        body.append('<div class="sub">当前空仓</div>')
-    body.append('<div class="sub" style="margin:2px 0 4px">三标的动态</div>')
-    for s in d.get("symbols") or []:
-        price = _fmt_money(s.get("price"))
-        dense = esc(s.get("dense_cnt"))
-        dist_l = _fmt_pct(_dist_pct(s.get("price"), s.get("long_trigger")))
-        dist_s = _fmt_pct(_dist_pct(s.get("price"), s.get("short_trigger")))
-        _held = {"long": "多", "short": "空"}.get(s.get("position_side"))
-        held = f" · 持仓{_held}" if _held else ""
-        body.append(
-            f'<div class="sym">{esc(s.get("coin"))} <span class="v">{price} · 密集 {dense}/6 · 距上轨 {dist_l} · 距下轨 {dist_s}{held}</span></div>'
-        )
-    for e in (d.get("events") or [])[:3]:
-        body.append(f'<div class="ev"><span class="t">{_fmt_time(e.get("ts"))}</span>{esc(e.get("message"))}</div>')
-    perf = d.get("perf") or {}
-    if perf.get("n"):
-        body.append(
-            f'<div class="sub" style="margin-top:6px">实盘 {esc(perf.get("n"))} 笔 · 胜率 {_fmt_pct(perf.get("win_rate"))} · 均R {_fmt_signed(perf.get("avg_r"))} · 总R {_fmt_signed(perf.get("total_r"))}</div>'
-        )
-    return head.format(cls=_dot_class(entry), body="".join(body))
+
+
+def _events_lines(events: list, n: int = 3) -> list[str]:
+    return [
+        f'<div class="ev"><span class="t">{_fmt_time(e.get("ts"))}</span>{esc(e.get("message"))}</div>'
+        for e in (events or [])[:n]
+    ]
+
+
+def _sym_line(name, price, dense: str, tail: str, held) -> str:
+    held_html = f' · <span class="mark">持仓{held}</span>' if held else ""
+    return (
+        f'<div class="sym">{esc(name)} <span class="v">{_fmt_money(price)} · 密集 {dense}{tail}{held_html}</span></div>'
+    )
+
+
+def _card_head(title: str, entry: dict | None, body: str) -> str:
+    return f'<div class="card"><h2><span class="dot {_dot_class(entry)}"></span>{title}</h2>{body}</div>'
+
+
+def _init_card(title: str) -> str:
+    return _card_head(title, None, '<div class="init">等待第一轮拉取…</div>')
+
+
+def _error_card(title: str, entry: dict) -> str:
+    return _card_head(
+        title, entry, f'<div class="banner err">不可用：{esc(entry.get("error"))}</div>'
+    )
+
+
+def _stale_banner(entry: dict) -> str:
+    if entry.get("stale"):
+        return f'<div class="banner warn">数据 {_fmt_age(entry.get("age_s"))}未刷新</div>'
+    return ""
 
 
 def _dist_pct(price, trigger) -> float | None:
@@ -197,66 +217,140 @@ def _dist_pct(price, trigger) -> float | None:
     return (t - p) / p
 
 
-def _lt_card(entry: dict | None) -> str:
-    head = '<div class="card"><h2><span class="dot {cls}"></span>Lighter</h2>{body}</div>'
+def _hl_card(entry: dict | None) -> str:
     if entry is None:
-        return head.format(cls="warn", body='<div class="init">等待第一轮拉取…</div>')
+        return _init_card("Hyperliquid")
     if not entry.get("ok"):
-        return head.format(
-            cls="bad",
-            body=f'<div class="banner err">不可用：{esc(entry.get("error"))}</div>',
-        )
+        return _error_card("Hyperliquid", entry)
     d = entry.get("data") or {}
-    body: list[str] = []
-    if entry.get("stale"):
-        body.append(f'<div class="banner warn">数据 {_fmt_age(entry.get("age_s"))}未刷新</div>')
+    body: list[str] = [_stale_banner(entry)]
+
+    positions = d.get("positions") or []
+    if positions:
+        stops = (
+            "<span class='mark'>✔</span>"
+            if all(p.get("has_stop") for p in positions)
+            else "<span class='miss'>⚠ 止损缺口</span>"
+        )
+    else:
+        stops = ""
+    fresh = _fmt_age(
+        max(0.0, time.time() - float(d["last_event_ts"])) if d.get("last_event_ts") else None
+    )
     bits = [f"模式 {esc(d.get('mode') or '—')}"]
     if d.get("kill"):
         bits.append(f'<span style="color:var(--bad)">已 kill（{esc(d.get("kill_reason"))}）</span>')
+    if stops:
+        bits.append(f"止损 {stops}")
+    if fresh:
+        bits.append(f"tick {fresh}")
+    if d.get("agent_days_left") is not None:
+        bits.append(f"API 剩 {esc(d['agent_days_left'])} 天")
+    if d.get("feed_ok") is False:
+        bits.append('<span style="color:var(--warn)">数据源异常</span>')
+    body.append(_sub_line(bits))
+    body.append(_equity_line(d.get("equity"), d.get("unrealized_pnl")))
+
+    if positions:
+        rows = []
+        for p in positions:
+            side = "多" if p.get("side") == 1 else ("空" if p.get("side") == -1 else "—")
+            rows.append(
+                f"<tr><td>{esc(p.get('coin'))} {side} ×{esc(p.get('leverage'))}</td>"
+                f"<td>{_fmt_money(p.get('size'))}</td>"
+                f"<td>{_fmt_money(p.get('entry_px'))}</td>"
+                f"<td>{_fmt_money(p.get('mark_px'))}</td>"
+                f"<td>{_fmt_signed(p.get('unrealized_pnl'))}</td>"
+                f"<td>{_stop_cell(bool(p.get('has_stop')), p.get('stop_px'))}</td></tr>"
+            )
+        body.append(_positions_table(rows))
+    else:
+        body.append('<div class="sub">当前空仓</div>')
+
+    body.append('<div class="sub" style="margin:2px 0 4px">三标的动态</div>')
+    for s in d.get("symbols") or []:
+        dist_l = _fmt_pct(_dist_pct(s.get("price"), s.get("long_trigger")))
+        dist_s = _fmt_pct(_dist_pct(s.get("price"), s.get("short_trigger")))
+        held = _held_text(s.get("position_side"))
+        body.append(_sym_line(
+            s.get("coin"), s.get("price"), f"{esc(s.get('dense_cnt'))}/6",
+            f" · 距上轨 {dist_l} · 距下轨 {dist_s}",
+            held,
+        ))
+    body += _events_lines(d.get("events"))
+
+    perf = d.get("perf") or {}
+    if perf.get("n"):
+        body.append(
+            f'<div class="sub" style="margin-top:6px">实盘 {esc(perf.get("n"))} 笔 · 胜率 {_fmt_pct(perf.get("win_rate"))} · 均R {_fmt_signed(perf.get("avg_r"))} · 总R {_fmt_signed(perf.get("total_r"))}</div>'
+        )
+    return _card_head("Hyperliquid", entry, "".join(body))
+
+
+def _lt_card(entry: dict | None) -> str:
+    if entry is None:
+        return _init_card("Lighter")
+    if not entry.get("ok"):
+        return _error_card("Lighter", entry)
+    d = entry.get("data") or {}
+    body: list[str] = [_stale_banner(entry)]
+
+    positions = d.get("positions") or []
+    if d.get("stops_all_protected") is True:
+        stops = "<span class='mark'>✔</span>"
+    elif d.get("stops_all_protected") is False:
+        stops = "<span class='miss'>⚠ 止损未全覆盖</span>"
+    else:
+        stops = "<span class='miss'>⚠ 读数降级</span>"
+    bits = [f"模式 {esc(d.get('mode') or '—')}"]
+    if d.get("kill"):
+        bits.append(f'<span style="color:var(--bad)">已 kill（{esc(d.get("kill_reason"))}）</span>')
+    bits.append(f"止损 {stops}")
+    fresh = _fmt_age(d.get("last_tick_age_s"))
+    if fresh:
+        bits.append(f"tick {fresh}")
     if d.get("dd") is not None:
         bits.append(f"回撤 {_fmt_pct(d.get('dd'))}")
-    if d.get("stops_all_protected") is False:
-        bits.append('<span style="color:var(--bad)">止损未全覆盖</span>')
-    elif d.get("stops_degraded"):
-        bits.append('<span style="color:var(--warn)">止损读数降级</span>')
     for part in d.get("degraded_parts") or []:
         bits.append(f'<span style="color:var(--warn)">⚠ {esc(part.split(":", 1)[0])}</span>')
-    tick = d.get("last_tick_age_s")
-    if tick is not None:
-        bits.append(f"tick {_fmt_age(tick)}")
-    body.append(f'<div class="sub">{" · ".join(bits)}</div>')
-    body.append(
-        f'<div class="big">权益 {_fmt_money(d.get("equity"))} U</div>'
-    )
-    if d.get("positions"):
+    body.append(_sub_line(bits))
+
+    upnl = None
+    if positions:
+        try:
+            upnl = sum(float(p.get("upnl") or 0) for p in positions)
+        except (TypeError, ValueError):
+            upnl = None
+    body.append(_equity_line(d.get("equity"), upnl))
+
+    if positions:
         rows = []
-        for p in d["positions"]:
-            stop = _fmt_money(p.get("stop_price")) if p.get("stop_price") else '<span style="color:var(--bad)">无</span>'
+        for p in positions:
             rows.append(
                 f"<tr><td>{esc(p.get('symbol'))} {esc(p.get('side_text'))}</td>"
                 f"<td>{_fmt_money(p.get('qty'))}</td>"
                 f"<td>{_fmt_money(p.get('entry_price'))}</td>"
                 f"<td>{_fmt_money(p.get('price'))}</td>"
                 f"<td>{_fmt_signed(p.get('upnl'))}</td>"
-                f"<td>{stop}</td></tr>"
+                f"<td>{_stop_cell(bool(p.get('stop_price')), p.get('stop_price'))}</td></tr>"
             )
-        body.append(
-            '<table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>浮盈U</th><th>止损</th></tr>'
-            + "".join(rows)
-            + "</table>"
-        )
+        body.append(_positions_table(rows))
     else:
         body.append('<div class="sub">当前空仓</div>')
+
     body.append('<div class="sub" style="margin:2px 0 4px">三标的动态</div>')
     for s in d.get("symbols") or []:
-        price = _fmt_money(s.get("price"))
-        dense = f'{esc(s.get("dense_bars"))}/{esc(s.get("min_dense_bars"))}'
-        body.append(
-            f'<div class="sym">{esc(s.get("symbol"))} <span class="v">{price} · 密集 {dense} · {esc(s.get("verdict"))}</span></div>'
-        )
-    for e in (d.get("events") or [])[:3]:
-        body.append(f'<div class="ev"><span class="t">{_fmt_time(e.get("ts"))}</span>{esc(e.get("message"))}</div>')
-    return head.format(cls=_dot_class(entry), body="".join(body))
+        dense = f"{esc(s.get('dense_bars'))}/{esc(s.get('min_dense_bars'))}"
+        verdict = esc(s.get("verdict"))
+        # verdict 已带「持仓中」时不再叠 held 标记，避免「持仓中 · 持仓空」重复
+        held = _held_text(s.get("held_side")) if "持仓" not in verdict else None
+        body.append(_sym_line(
+            s.get("symbol"), s.get("price"), dense,
+            f" · {verdict}" if verdict else "",
+            held,
+        ))
+    body += _events_lines(d.get("events"))
+    return _card_head("Lighter", entry, "".join(body))
 
 
 def render_page(summary: dict, hl_panel_url: str, lt_panel_url: str) -> str:
@@ -265,7 +359,10 @@ def render_page(summary: dict, hl_panel_url: str, lt_panel_url: str) -> str:
         "<!doctype html><html lang='zh'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         "<meta name='apple-mobile-web-app-capable' content='yes'>"
+        "<meta name='apple-mobile-web-app-title' content='trade-hub'>"
+        "<meta name='theme-color' content='#12151a'>"
         "<title>trade-hub</title>"
+        f"{_HEAD_LINKS}"
         f"<style>{_CSS}</style></head><body>"
         f"<header><h1>trade-hub</h1><span class='gen'>更新 {gen} UTC</span></header>"
         + _hl_card(summary.get("hl"))

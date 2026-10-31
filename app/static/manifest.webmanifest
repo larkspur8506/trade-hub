@@ -1,0 +1,14 @@
+{
+  "name": "trade-hub",
+  "short_name": "trade-hub",
+  "description": "双均线两套交易系统的只读聚合页（HL + Lighter）",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#12151a",
+  "theme_color": "#12151a",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -5,9 +5,10 @@ import asyncio
 import contextlib
 import hmac
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 
 from . import upstream
 from .config import Config
@@ -18,6 +19,7 @@ logger = logging.getLogger("trade-hub")
 
 _COOKIE = "hub_token"
 _STALE_FALLBACK_S = 180.0
+_STATIC = Path(__file__).resolve().parent / "static"
 
 
 def _authorized(request: Request, cfg: Config, k: str) -> bool:
@@ -69,6 +71,32 @@ def create_app(cfg: Config | None = None, store: SnapshotStore | None = None, ru
     @app.get("/health")
     async def health() -> dict:
         return {"ok": True, "service": "trade-hub"}
+
+    @app.get("/apple-touch-icon.png")
+    async def icon_apple() -> FileResponse:
+        return FileResponse(_STATIC / "apple-touch-icon.png", media_type="image/png")
+
+    @app.get("/favicon-32.png")
+    async def icon_32() -> FileResponse:
+        return FileResponse(_STATIC / "favicon-32.png", media_type="image/png")
+
+    @app.get("/favicon.ico")
+    async def favicon() -> FileResponse:
+        return FileResponse(_STATIC / "favicon-32.png", media_type="image/png")
+
+    @app.get("/icon-192.png")
+    async def icon_192() -> FileResponse:
+        return FileResponse(_STATIC / "icon-192.png", media_type="image/png")
+
+    @app.get("/icon-512.png")
+    async def icon_512() -> FileResponse:
+        return FileResponse(_STATIC / "icon-512.png", media_type="image/png")
+
+    @app.get("/manifest.webmanifest")
+    async def manifest() -> FileResponse:
+        return FileResponse(
+            _STATIC / "manifest.webmanifest", media_type="application/manifest+json"
+        )
 
     @app.get("/api/summary")
     async def api_summary(request: Request, k: str = ""):

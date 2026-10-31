@@ -43,6 +43,37 @@ class RenderTests(unittest.TestCase):
         ):
             self.assertIn(needle, html, f"missing: {needle}")
 
+    def test_unified_markers(self):
+        """两卡的标记语言一致：止损都有 ✔、持仓标记都有、子行结构同序。"""
+        cfg = _cfg()
+        html = render_page(
+            _store_with_both().summary(stale_after_s=180),
+            cfg.hl_panel_url,
+            cfg.lt_panel_url,
+        )
+        # 止损覆盖 ✔：HL 仓位行 + HL 子行 + LT 仓位行 + LT 子行 至少 4 处
+        self.assertGreaterEqual(html.count("<span class='mark'>✔</span>"), 4)
+        # 持仓标记：HL symbol_state(position_side=short) 一处；LT 的 SOL verdict
+        # 本身是「持仓中」，按规则不叠加 held 标记，避免重复
+        self.assertEqual(html.count('<span class="mark">持仓空</span>'), 1)
+        self.assertEqual(html.count("持仓中"), 1)
+        # 两卡子行都有 tick 新鲜度与止损位（tick 在止损标记之后：" · tick "）
+        self.assertEqual(html.count("止损 <span class='mark'>✔</span>"), 2)
+        self.assertEqual(html.count(" · tick "), 2)
+        # 两卡权益行都带浮盈
+        self.assertEqual(html.count("<span class=\"upnl\">浮盈 "), 2)
+
+    def test_head_links_are_local_icons(self):
+        cfg = _cfg()
+        html = render_page(
+            _store_with_both().summary(stale_after_s=180),
+            cfg.hl_panel_url,
+            cfg.lt_panel_url,
+        )
+        self.assertIn("<link rel='apple-touch-icon' href='/apple-touch-icon.png'>", html)
+        self.assertIn("<link rel='icon' type='image/png' href='/favicon-32.png'>", html)
+        self.assertIn("<link rel='manifest' href='/manifest.webmanifest'>", html)
+
     def test_self_contained_no_external_assets(self):
         cfg = _cfg()
         html = render_page(
@@ -52,8 +83,14 @@ class RenderTests(unittest.TestCase):
         )
         self.assertNotIn("<script src=", html)
         self.assertNotIn("@import", html)
-        self.assertNotIn("<link ", html)
         self.assertNotIn("cdn.", html)
+        # <link> 允许，但必须全部指向本站（相对路径）——指外网的算外链资产
+        import re
+
+        link_hrefs = re.findall(r"<link[^>]*href='([^']*)'", html)
+        self.assertTrue(link_hrefs)
+        for href in link_hrefs:
+            self.assertTrue(href.startswith("/"), f"external link asset: {href}")
         # the only external URLs allowed are the two panel jump links
         external = [line for line in html.split("href=") if "http" in line.split(">")[0]]
         self.assertEqual(len(external), 2, external)
