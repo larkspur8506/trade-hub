@@ -45,15 +45,15 @@ class RenderTests(unittest.TestCase):
             self.assertIn(needle, html, f"missing: {needle}")
 
     def test_unified_markers(self):
-        """两卡的标记语言一致：止损都有 ✔、持仓标记都有、子行结构同序。"""
+        """两卡的标记语言一致：状态行止损都有 ✔、持仓标记都有、子行结构同序。"""
         cfg = _cfg()
         html = render_page(
             _store_with_both().summary(stale_after_s=180),
             cfg.hl_panel_url,
             cfg.lt_panel_url,
         )
-        # 止损覆盖 ✔：HL 仓位行 + HL 子行 + LT 仓位行 + LT 子行 至少 4 处
-        self.assertGreaterEqual(html.count("<span class='mark'>✔</span>"), 4)
+        # 止损 ✔ 只在状态行出现（仓位表只放裸价格，加标记会把行顶成两行）
+        self.assertEqual(html.count("<span class='mark'>✔</span>"), 2)
         # 持仓标记：HL symbol_state(position_side=short) 一处；LT 的 SOL verdict
         # 本身是「持仓中」，按规则不叠加 held 标记，避免重复
         self.assertEqual(html.count('<span class="mark">持仓空</span>'), 1)
@@ -132,6 +132,13 @@ class RenderTests(unittest.TestCase):
         self.assertIn("SOL 平空 1.13 @ 102.44（-3.24 U）", html)
         self.assertIn("SOL 开空 0.72 @ 95.60", html)
         self.assertIn("SOL 平多 1.19 @ 102.73（-3.64 U）", html)
+        # 成交时间是北京时间（fixture ts 1793304200 = UTC 20:03 → 北京 04:03）
+        self.assertIn(">04:03</span>SOL 开空 1.17 @ 99.45", html)
+        # 止损列裸价格：有 <td>104.95</td>，不再带 ✔
+        self.assertIn("<td>104.95</td>", html)
+        self.assertNotIn("<td>104.95 <span", html)
+        # 头部生成时间是北京时间，无 UTC 后缀
+        self.assertNotIn(" UTC</span>", html)
         # 运维事件不再出现在底部区
         self.assertNotIn("executor 心跳", html)
         # 离场价：两表表头；HL 取 symbol_state SMA20、LT 取 exit_price，

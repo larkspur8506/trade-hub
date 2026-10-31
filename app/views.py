@@ -5,8 +5,9 @@ convention as the two source panels — no theme toggle by design.
 
 The two system cards share one visual language: identical status-line order
 (模式 · kill · 止损 · tick 新鲜度, then system-specific extras), identical
-positions-table columns, and the same ✔/⚠ markers for stop coverage — so a
-glance compares the two systems without re-learning the layout.
+positions-table columns (stop column shows the bare price — a marker makes the
+row wrap on mobile), so a glance compares the two systems without re-learning
+the layout. All displayed times are Beijing time (UTC+8).
 """
 from __future__ import annotations
 
@@ -103,7 +104,7 @@ def _fmt_time(ts) -> str:
     if ts is None:
         return "—"
     try:
-        return time.strftime("%H:%M", time.gmtime(float(ts)))
+        return time.strftime("%H:%M", time.gmtime(float(ts) + 8 * 3600))
     except (TypeError, ValueError):
         return "—"
 
@@ -147,9 +148,9 @@ def _held_text(side) -> str | None:
 
 
 def _stop_cell(covered: bool, price) -> str:
-    """Unified stop cell: price + ✔ when covered, red 无 when absent."""
+    """止损列只放价格（加标记会把行顶成两行）；缺止损才红字提示。"""
     if covered:
-        return f"{_fmt_money(price)} <span class='mark'>✔</span>"
+        return _fmt_money(price)
     return "<span class='miss'>无</span>"
 
 
@@ -394,7 +395,7 @@ def _lt_card(entry: dict | None) -> str:
 
 
 def render_page(summary: dict, hl_panel_url: str, lt_panel_url: str) -> str:
-    gen = time.strftime("%H:%M:%S", time.gmtime(summary.get("generated_at", time.time())))
+    gen = time.strftime("%H:%M:%S", time.gmtime(summary.get("generated_at", time.time()) + 8 * 3600))
     return (
         "<!doctype html><html lang='zh'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
@@ -404,7 +405,7 @@ def render_page(summary: dict, hl_panel_url: str, lt_panel_url: str) -> str:
         "<title>trade-hub</title>"
         f"{_HEAD_LINKS}"
         f"<style>{_CSS}</style></head><body>"
-        f"<header><h1>trade-hub</h1><span class='gen'>更新 {gen} UTC</span></header>"
+        f"<header><h1>trade-hub</h1><span class='gen'>更新 {gen}</span></header>"
         + _hl_card(summary.get("hl"))
         + _lt_card(summary.get("lt"))
         + f"<nav class='links'><a href='{html.escape(hl_panel_url, quote=True)}'>打开 HL 面板</a>"
