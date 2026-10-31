@@ -152,11 +152,12 @@ class RenderTests(unittest.TestCase):
             cfg.hl_panel_url,
             cfg.lt_panel_url,
         )
-        # 成交行：HL 最新先是开空腿，再是带已实现盈亏的平空腿；LT 同构
+        # 成交行：HL 最新先是开空腿，再是带已实现盈亏的平空腿；LT 同构。
+        # LT 离场腿的 side_text 是成交方向（买入），渲染按被平仓位方向显示「平空」
         self.assertIn("SOL 开空 1.17 @ 99.45", html)
         self.assertIn("SOL 平空 1.13 @ 102.44（-3.24 U）", html)
         self.assertIn("SOL 开空 0.72 @ 95.60", html)
-        self.assertIn("SOL 平多 1.19 @ 102.73（-3.64 U）", html)
+        self.assertIn("SOL 平空 1.19 @ 102.73（-3.64 U）", html)
         # 成交时间是北京时间（fixture ts 1793304200 = UTC 20:03 → 北京 04:03）
         self.assertIn(">04:03</span>SOL 开空 1.17 @ 99.45", html)
         # 止损列裸价格：有 <td>104.95</td>，不再带 ✔
