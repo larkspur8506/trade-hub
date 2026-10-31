@@ -144,6 +144,9 @@ class RenderTests(unittest.TestCase):
         # 离场价：两表表头；HL 取 symbol_state SMA20、LT 取 exit_price，
         # fixtures 里两者恰好同为 99.19，所以单元格出现两处
         self.assertEqual(html.count("<th>离场</th>"), 2)
+        # 列序：浮盈U 在离场前（用户拍板的对调）
+        self.assertEqual(html.count("<th>浮盈U</th><th>离场</th>"), 2)
+        self.assertEqual(html.count("<th>离场</th><th>浮盈U</th>"), 0)
         self.assertEqual(html.count("<td>99.19</td>"), 2)
         # 无成交兜底
         st = SnapshotStore()

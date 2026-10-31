@@ -168,7 +168,7 @@ def _equity_line(equity, upnl) -> str:
 
 def _positions_table_hl(rows: list[str]) -> str:
     return (
-        '<table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>离场</th><th>浮盈U</th><th>止损</th></tr>'
+        '<table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>浮盈U</th><th>离场</th><th>止损</th></tr>'
         + "".join(rows)
         + "</table>"
     )
@@ -176,7 +176,7 @@ def _positions_table_hl(rows: list[str]) -> str:
 
 def _positions_table_lt(rows: list[str]) -> str:
     return (
-        '<table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>离场</th><th>浮盈U</th><th>止损</th></tr>'
+        '<table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>浮盈U</th><th>离场</th><th>止损</th></tr>'
         + "".join(rows)
         + "</table>"
     )
@@ -299,8 +299,8 @@ def _hl_card(entry: dict | None) -> str:
                 f"<td>{_fmt_money(p.get('size'))}</td>"
                 f"<td>{_fmt_money(p.get('entry_px'))}</td>"
                 f"<td>{_fmt_money(p.get('mark_px'))}</td>"
-                f"<td>{_fmt_money(p.get('exit_px'))}</td>"
                 f"<td>{_fmt_signed(p.get('unrealized_pnl'))}</td>"
+                f"<td>{_fmt_money(p.get('exit_px'))}</td>"
                 f"<td>{_stop_cell(bool(p.get('has_stop')), p.get('stop_px'))}</td></tr>"
             )
         body.append(_positions_table_hl(rows))
@@ -371,8 +371,8 @@ def _lt_card(entry: dict | None) -> str:
                 f"<td>{_fmt_money(p.get('qty'))}</td>"
                 f"<td>{_fmt_money(p.get('entry_price'))}</td>"
                 f"<td>{_fmt_money(p.get('price'))}</td>"
-                f"<td>{_fmt_money(p.get('exit_price'))}</td>"
                 f"<td>{_fmt_signed(p.get('upnl'))}</td>"
+                f"<td>{_fmt_money(p.get('exit_price'))}</td>"
                 f"<td>{_stop_cell(bool(p.get('stop_price')), p.get('stop_price'))}</td></tr>"
             )
         body.append(_positions_table_lt(rows))
