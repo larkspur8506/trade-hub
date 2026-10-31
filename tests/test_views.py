@@ -131,6 +131,8 @@ class RenderTests(unittest.TestCase):
         self.assertIn("等密集（带宽未进门槛）", html)
         self.assertIn("持仓空（LT）", html)
         self.assertNotIn("距上轨", html)
+        # LT 独撑且 verdict 带「持仓」时，verdict 与持仓标记不重复出现
+        self.assertEqual(html.count("持仓中"), 0)
 
     def test_symbols_card_hidden_without_both(self):
         st = SnapshotStore()

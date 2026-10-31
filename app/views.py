@@ -251,14 +251,6 @@ def _symbols_card(hl_entry: dict | None, lt_entry: dict | None) -> str:
             dense = f"{esc(l.get('dense_bars'))}/{esc(l.get('min_dense_bars'))}"
         else:
             dense = "—/6"
-        if h and h.get("long_trigger") is not None and h.get("short_trigger") is not None:
-            dl = _fmt_pct(_dist_pct(h.get("price"), h.get("long_trigger")))
-            ds = _fmt_pct(_dist_pct(h.get("price"), h.get("short_trigger")))
-            tail = f" · 距上轨 {dl} · 距下轨 {ds}"
-        elif l and l.get("verdict"):
-            tail = f" · {esc(l.get('verdict'))}"
-        else:
-            tail = ""
         marks = []
         hh = _held_text(h.get("position_side")) if h else None
         lh = _held_text(l.get("held_side")) if l else None
@@ -269,6 +261,18 @@ def _symbols_card(hl_entry: dict | None, lt_entry: dict | None) -> str:
                 marks.append(f"持仓{hh}（HL）")
             if lh:
                 marks.append(f"持仓{lh}（LT）")
+        # verdict 已含「持仓」且合并标记已表达时不再显示，避免「持仓中 · 持仓空（HL·LT）」
+        verdict = l.get("verdict") if l else None
+        if verdict and marks and "持仓" in str(verdict):
+            verdict = None
+        if h and h.get("long_trigger") is not None and h.get("short_trigger") is not None:
+            dl = _fmt_pct(_dist_pct(h.get("price"), h.get("long_trigger")))
+            ds = _fmt_pct(_dist_pct(h.get("price"), h.get("short_trigger")))
+            tail = f" · 距上轨 {dl} · 距下轨 {ds}"
+        elif verdict:
+            tail = f" · {esc(verdict)}"
+        else:
+            tail = ""
         held_html = "".join(f' · <span class="mark">{esc(m)}</span>' for m in marks)
         lines.append(
             f'<div class="sym">{esc(coin)} <span class="v">{_fmt_money(price)} · 密集 {dense}{tail}{held_html}</span></div>'
