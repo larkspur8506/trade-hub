@@ -68,7 +68,32 @@ def hl_status() -> dict:
             }
         ],
         "orders_recent": [],
-        "fills": [],
+        "fills": [
+            {
+                "ts": 1793304200.0,
+                "coin": "SOL",
+                "side": -1,
+                "sz": 1.17,
+                "px": 99.446,
+                "fee": 0.052,
+                "fee_token": "USDC",
+                "dir": "Open Short",
+                "closed_pnl": 0.0,
+                "reduce_only": False,
+            },
+            {
+                "ts": 1793289791.0,
+                "coin": "SOL",
+                "side": -1,
+                "sz": 1.13,
+                "px": 102.44,
+                "fee": 0.052,
+                "fee_token": "USDC",
+                "dir": "Close Short",
+                "closed_pnl": -3.244,
+                "reduce_only": True,
+            },
+        ],
         "signals": [],
         "symbol_state": [
             {
@@ -295,6 +320,46 @@ def lt_symbols() -> dict:
         "warnings": [],
         "degraded": False,
         "block": "symbols",
+    }
+
+
+def lt_records() -> dict:
+    """GET /api/records — trades only carry entry/exit legs (kind field)."""
+    return {
+        "as_of": 1793438818.0,
+        "funds": {"equity": 496.69, "trade_count": 3, "realized_total": -3.64},
+        "trades": [
+            {
+                "id": 4,
+                "ts": 1793329428.4,
+                "symbol": "SOL",
+                "side": -1,
+                "side_text": "空",
+                "kind": "entry",
+                "kind_text": "开仓",
+                "qty": 0.717,
+                "price": 95.601,
+                "notional": 68.55,
+                "fee": 0.0,
+                "realized_pnl": None,
+                "position_id": 3,
+            },
+            {
+                "id": 2,
+                "ts": 1793289826.0,
+                "symbol": "SOL",
+                "side": 1,
+                "side_text": "多",
+                "kind": "exit",
+                "kind_text": "离场",
+                "qty": 1.191,
+                "price": 102.731,
+                "notional": 122.35,
+                "fee": 0.0,
+                "realized_pnl": -3.637,
+                "position_id": 2,
+            },
+        ],
     }
 
 

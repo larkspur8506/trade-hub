@@ -39,6 +39,9 @@ def _fetch_json(url: str, timeout: float) -> tuple[Optional[dict], str]:
 
 def normalize_hl(status: dict) -> dict:
     acc = status.get("account") or {}
+    sma20_by_coin = {
+        s.get("coin"): s.get("sma20") for s in status.get("symbol_state") or []
+    }
     positions = [
         {
             "coin": p.get("coin"),
@@ -50,6 +53,8 @@ def normalize_hl(status: dict) -> dict:
             "has_stop": bool(p.get("has_stop")),
             "stop_px": p.get("stop_px"),
             "leverage": p.get("leverage"),
+            # 离场线 = SMA20（与 HL 面板口径一致：收盘破线离场）
+            "exit_px": sma20_by_coin.get(p.get("coin")),
         }
         for p in status.get("positions") or []
     ]
@@ -69,6 +74,17 @@ def normalize_hl(status: dict) -> dict:
         {"ts": e.get("ts"), "kind": e.get("kind"), "message": e.get("message")}
         for e in (status.get("events") or [])[:5]
     ]
+    fills = [
+        {
+            "ts": f.get("ts"),
+            "coin": f.get("coin"),
+            "dir": f.get("dir"),
+            "sz": f.get("sz"),
+            "px": f.get("px"),
+            "closed_pnl": f.get("closed_pnl"),
+        }
+        for f in (status.get("fills") or [])[:5]
+    ]
     perf = status.get("perf") or {}
     feed = (status.get("system") or {}).get("feed") or []
     return {
@@ -84,6 +100,7 @@ def normalize_hl(status: dict) -> dict:
         "positions": positions,
         "symbols": symbols,
         "events": events,
+        "fills": fills,
         "perf": {
             "n": perf.get("n"),
             "win_rate": perf.get("win_rate"),
@@ -109,6 +126,7 @@ def normalize_lt(
     stops: Optional[dict],
     symbols: Optional[dict],
     events: Optional[dict],
+    records: Optional[dict] = None,
     degraded_parts: Optional[list] = None,
 ) -> dict:
     st = status or {}
@@ -122,6 +140,7 @@ def normalize_lt(
             "upnl": p.get("upnl"),
             "upnl_pct": p.get("upnl_pct"),
             "stop_price": p.get("stop_price"),
+            "exit_price": p.get("exit_price"),
             "notional": p.get("notional"),
             "liq_price": p.get("liq_price"),
             "funding_rate": p.get("funding_rate"),
@@ -130,6 +149,19 @@ def normalize_lt(
         for p in (positions or {}).get("positions") or []
         if p.get("state") == "OPEN"
     ]
+    trades = [
+        {
+            "ts": t.get("ts"),
+            "symbol": t.get("symbol"),
+            "kind_text": t.get("kind_text"),
+            "side_text": t.get("side_text"),
+            "qty": t.get("qty"),
+            "price": t.get("price"),
+            "realized_pnl": t.get("realized_pnl"),
+        }
+        for t in (records or {}).get("trades") or []
+        if t.get("kind") in ("entry", "exit")
+    ][:5]
     symbols_out = [
         {
             "symbol": s.get("symbol"),
@@ -164,6 +196,7 @@ def normalize_lt(
             {"ts": e.get("ts"), "kind": e.get("kind"), "message": e.get("message")}
             for e in ev[:5]
         ],
+        "trades": trades,
         "degraded_parts": list(degraded_parts or []),
     }
 
@@ -181,7 +214,7 @@ async def collect_hl(cfg, fetch: Callable | None = None) -> Source:
     return Source(ok=True, as_of=time.time(), data=normalize_hl(payload))
 
 
-_LT_PARTS = ("/status", "/positions", "/stops", "/symbols", "/events?limit=5")
+_LT_PARTS = ("/status", "/positions", "/stops", "/symbols", "/events?limit=5", "/api/records")
 
 
 async def collect_lt(cfg, fetch: Callable | None = None) -> Source:
@@ -206,17 +239,20 @@ async def collect_lt(cfg, fetch: Callable | None = None) -> Source:
     stops_payload, stops_err = by_path["/stops"]
     symbols_payload, symbols_err = by_path["/symbols"]
     events_payload, events_err = by_path["/events?limit=5"]
+    records_payload, records_err = by_path["/api/records"]
     for name, err in (
         ("positions", positions_err),
         ("stops", stops_err),
         ("symbols", symbols_err),
         ("events", events_err),
+        ("records", records_err),
     ):
         if err:
             degraded.append(f"{name}: {err}")
 
     data = normalize_lt(
         status_payload, positions_payload, stops_payload, symbols_payload, events_payload,
+        records=records_payload,
         degraded_parts=degraded,
     )
     return Source(ok=True, as_of=time.time(), data=data)

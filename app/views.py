@@ -165,19 +165,57 @@ def _equity_line(equity, upnl) -> str:
     return f'<div class="big">权益 {_fmt_money(equity)} U{upnl_html}</div>'
 
 
-def _positions_table(rows: list[str]) -> str:
+def _positions_table_hl(rows: list[str]) -> str:
     return (
-        '<table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>浮盈U</th><th>止损</th></tr>'
+        '<table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>离场</th><th>浮盈U</th><th>止损</th></tr>'
         + "".join(rows)
         + "</table>"
     )
 
 
-def _events_lines(events: list, n: int = 3) -> list[str]:
-    return [
-        f'<div class="ev"><span class="t">{_fmt_time(e.get("ts"))}</span>{esc(e.get("message"))}</div>'
-        for e in (events or [])[:n]
-    ]
+def _positions_table_lt(rows: list[str]) -> str:
+    return (
+        '<table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>离场</th><th>浮盈U</th><th>止损</th></tr>'
+        + "".join(rows)
+        + "</table>"
+    )
+
+
+_HL_DIR = {
+    "Open Short": "开空",
+    "Close Short": "平空",
+    "Open Long": "开多",
+    "Close Long": "平多",
+}
+
+
+def _hl_fill_lines(fills: list, n: int = 3) -> list[str]:
+    lines = []
+    for f in (fills or [])[:n]:
+        act = _HL_DIR.get(f.get("dir") or "", f.get("dir") or "—")
+        pnl = ""
+        if str(f.get("dir") or "").startswith("Close") and f.get("closed_pnl") is not None:
+            pnl = f"（{_fmt_signed(f.get('closed_pnl'))} U）"
+        lines.append(
+            f'<div class="ev"><span class="t">{_fmt_time(f.get("ts"))}</span>'
+            f"{esc(f.get('coin'))} {esc(act)} {_fmt_money(f.get('sz'))} @ {_fmt_money(f.get('px'))}{pnl}</div>"
+        )
+    return lines or ['<div class="ev">暂无成交</div>']
+
+
+def _lt_trade_lines(trades: list, n: int = 3) -> list[str]:
+    lines = []
+    for t in (trades or [])[:n]:
+        kind = "开" if t.get("kind_text") == "开仓" else "平"
+        act = kind + esc(t.get("side_text") or "")
+        pnl = ""
+        if t.get("kind_text") == "离场" and t.get("realized_pnl") is not None:
+            pnl = f"（{_fmt_signed(t.get('realized_pnl'))} U）"
+        lines.append(
+            f'<div class="ev"><span class="t">{_fmt_time(t.get("ts"))}</span>'
+            f"{esc(t.get('symbol'))} {act} {_fmt_money(t.get('qty'))} @ {_fmt_money(t.get('price'))}{pnl}</div>"
+        )
+    return lines or ['<div class="ev">暂无成交</div>']
 
 
 def _sym_line(name, price, dense: str, tail: str, held) -> str:
@@ -260,10 +298,11 @@ def _hl_card(entry: dict | None) -> str:
                 f"<td>{_fmt_money(p.get('size'))}</td>"
                 f"<td>{_fmt_money(p.get('entry_px'))}</td>"
                 f"<td>{_fmt_money(p.get('mark_px'))}</td>"
+                f"<td>{_fmt_money(p.get('exit_px'))}</td>"
                 f"<td>{_fmt_signed(p.get('unrealized_pnl'))}</td>"
                 f"<td>{_stop_cell(bool(p.get('has_stop')), p.get('stop_px'))}</td></tr>"
             )
-        body.append(_positions_table(rows))
+        body.append(_positions_table_hl(rows))
     else:
         body.append('<div class="sub">当前空仓</div>')
 
@@ -277,7 +316,7 @@ def _hl_card(entry: dict | None) -> str:
             f" · 距上轨 {dist_l} · 距下轨 {dist_s}",
             held,
         ))
-    body += _events_lines(d.get("events"))
+    body += _hl_fill_lines(d.get("fills"))
 
     perf = d.get("perf") or {}
     if perf.get("n"):
@@ -331,10 +370,11 @@ def _lt_card(entry: dict | None) -> str:
                 f"<td>{_fmt_money(p.get('qty'))}</td>"
                 f"<td>{_fmt_money(p.get('entry_price'))}</td>"
                 f"<td>{_fmt_money(p.get('price'))}</td>"
+                f"<td>{_fmt_money(p.get('exit_price'))}</td>"
                 f"<td>{_fmt_signed(p.get('upnl'))}</td>"
                 f"<td>{_stop_cell(bool(p.get('stop_price')), p.get('stop_price'))}</td></tr>"
             )
-        body.append(_positions_table(rows))
+        body.append(_positions_table_lt(rows))
     else:
         body.append('<div class="sub">当前空仓</div>')
 
@@ -349,7 +389,7 @@ def _lt_card(entry: dict | None) -> str:
             f" · {verdict}" if verdict else "",
             held,
         ))
-    body += _events_lines(d.get("events"))
+    body += _lt_trade_lines(d.get("trades"))
     return _card_head("Lighter", entry, "".join(body))
 
 

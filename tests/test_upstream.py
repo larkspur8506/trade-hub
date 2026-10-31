@@ -99,7 +99,7 @@ class NormalizeLtTests(unittest.TestCase):
 
         src = asyncio.run(collect_lt(_cfg(), fetch=fake_fetch))
         self.assertTrue(src.ok)
-        self.assertEqual(len(src.data["degraded_parts"]), 4)
+        self.assertEqual(len(src.data["degraded_parts"]), 5)
 
     def test_uncovered_stops_counted(self):
         stops = fixtures.lt_stops()
@@ -151,15 +151,18 @@ class CollectorTests(unittest.TestCase):
                 return fixtures.lt_stops(), ""
             if url.endswith("/events?limit=5"):
                 return fixtures.lt_events(), ""
+            if url.endswith("/api/records"):
+                return fixtures.lt_records(), ""
             if url.endswith("/symbols"):
                 return fixtures.lt_symbols(), ""
             return None, "no fixture for " + url
 
         src = asyncio.run(collect_lt(_cfg(), fetch=fake_fetch))
         self.assertTrue(src.ok)
-        self.assertEqual(len(calls), 5)
-        self.assertTrue(any("/events?limit=5" in u for u in calls))
+        self.assertEqual(len(calls), 6)
+        self.assertTrue(any("/api/records" in u for u in calls))
         self.assertEqual(src.data["open_count"], 1)
+        self.assertEqual(len(src.data["trades"]), 2)
 
     def test_collect_lt_status_failure_fails_whole_source(self):
         def fake_fetch(url, timeout):
@@ -183,6 +186,8 @@ class CollectorTests(unittest.TestCase):
                 return fixtures.lt_stops(), ""
             if url.endswith("/events?limit=5"):
                 return fixtures.lt_events(), ""
+            if url.endswith("/api/records"):
+                return fixtures.lt_records(), ""
             return None, "no fixture for " + url
 
         src = asyncio.run(collect_lt(_cfg(), fetch=fake_fetch))
