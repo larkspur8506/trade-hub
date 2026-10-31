@@ -54,10 +54,13 @@ class RenderTests(unittest.TestCase):
         )
         # 止损 ✔ 只在状态行出现（仓位表只放裸价格，加标记会把行顶成两行）
         self.assertEqual(html.count("<span class='mark'>✔</span>"), 2)
-        # 持仓标记：合并卡里两边同向（HL short + LT held_side=-1）去重为一处
+        # 持仓标记：合并卡里两边同向（HL short + LT held_side=-1）去重为一处；
+        # 持仓标的的密集/触发线被面板置 NULL（不评估入场）→ 显示「持仓中」，
+        # 只空仓的 BTC/ETH 才有密集数和距上/下轨
         self.assertEqual(html.count("持仓空（HL·LT）"), 1)
-        self.assertEqual(html.count("持仓中"), 0)  # HL 有距上/下轨时 verdict 不渲染
-        self.assertEqual(html.count("距上轨"), 3)  # 三标的动态合并卡：每标的距离
+        self.assertEqual(html.count(" · 持仓中"), 1)
+        self.assertEqual(html.count(" · 密集 "), 2)
+        self.assertEqual(html.count("距上轨"), 2)
         # 两卡子行都有 tick 新鲜度与止损位（tick 在止损标记之后：" · tick "）
         self.assertEqual(html.count("止损 <span class='mark'>✔</span>"), 2)
         self.assertEqual(html.count(" · tick "), 2)
@@ -131,8 +134,9 @@ class RenderTests(unittest.TestCase):
         self.assertIn("等密集（带宽未进门槛）", html)
         self.assertIn("持仓空（LT）", html)
         self.assertNotIn("距上轨", html)
-        # LT 独撑且 verdict 带「持仓」时，verdict 与持仓标记不重复出现
-        self.assertEqual(html.count("持仓中"), 0)
+        # LT 独撑：空仓标的显示 verdict，持仓标的显示「持仓中」（verdict 不叠加）
+        self.assertEqual(html.count("等密集（带宽未进门槛）"), 2)
+        self.assertEqual(html.count(" · 持仓中"), 1)
 
     def test_symbols_card_hidden_without_both(self):
         st = SnapshotStore()

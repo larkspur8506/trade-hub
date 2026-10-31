@@ -126,9 +126,10 @@ def hl_status() -> dict:
                 "price": 95.52,
                 "sma20": 99.19,
                 "sma200": 103.0,
-                "long_trigger": 100.5,
-                "short_trigger": 96.8,
-                "dense_cnt": 4,
+                # 面板设计：持仓标的不评估入场 → 触发线/密集数下发 NULL
+                "long_trigger": None,
+                "short_trigger": None,
+                "dense_cnt": None,
                 "updated_at": 1793431983.0,
                 "position_side": "short",
             },

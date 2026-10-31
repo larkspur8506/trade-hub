@@ -245,6 +245,7 @@ def _symbols_card(hl_entry: dict | None, lt_entry: dict | None) -> str:
     for coin in order:
         h, l = hl_syms.get(coin), lt_syms.get(coin)
         price = ((h if base_is_hl else l) or h or l).get("price")
+        # 密集：基准侧有数就用，没有落到另一侧
         if h and h.get("dense_cnt") is not None:
             dense = f"{esc(h.get('dense_cnt'))}/6"
         elif l and l.get("dense_bars") is not None:
@@ -261,11 +262,17 @@ def _symbols_card(hl_entry: dict | None, lt_entry: dict | None) -> str:
                 marks.append(f"持仓{hh}（HL）")
             if lh:
                 marks.append(f"持仓{lh}（LT）")
-        # verdict 已含「持仓」且合并标记已表达时不再显示，避免「持仓中 · 持仓空（HL·LT）」
+        # 持仓标的不评估入场，密集/触发线无意义（面板置 NULL）→ 显示「持仓中」
+        held = bool(hh or lh)
+        # verdict 已含「持仓」时不再显示，避免「持仓中 · 持仓空（HL·LT）」
         verdict = l.get("verdict") if l else None
-        if verdict and marks and "持仓" in str(verdict):
+        if verdict and ("持仓" in str(verdict)):
             verdict = None
-        if h and h.get("long_trigger") is not None and h.get("short_trigger") is not None:
+        if held:
+            dense_part = "持仓中"
+        else:
+            dense_part = f"密集 {dense}"
+        if not held and h and h.get("long_trigger") is not None and h.get("short_trigger") is not None:
             dl = _fmt_pct(_dist_pct(h.get("price"), h.get("long_trigger")))
             ds = _fmt_pct(_dist_pct(h.get("price"), h.get("short_trigger")))
             tail = f" · 距上轨 {dl} · 距下轨 {ds}"
@@ -275,7 +282,7 @@ def _symbols_card(hl_entry: dict | None, lt_entry: dict | None) -> str:
             tail = ""
         held_html = "".join(f' · <span class="mark">{esc(m)}</span>' for m in marks)
         lines.append(
-            f'<div class="sym">{esc(coin)} <span class="v">{_fmt_money(price)} · 密集 {dense}{tail}{held_html}</span></div>'
+            f'<div class="sym">{esc(coin)} <span class="v">{_fmt_money(price)} · {dense_part}{tail}{held_html}</span></div>'
         )
     return '<div class="card"><h2>三标的动态</h2>' + "".join(lines) + "</div>"
 
