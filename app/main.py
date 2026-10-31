@@ -58,7 +58,9 @@ async def _poll_loop(cfg: Config, store: SnapshotStore) -> None:
         await asyncio.sleep(cfg.poll_s)
 
 
-def create_app(cfg: Config, store: SnapshotStore | None = None, run_poller: bool = True) -> FastAPI:
+def create_app(cfg: Config | None = None, store: SnapshotStore | None = None, run_poller: bool = True) -> FastAPI:
+    if cfg is None:
+        cfg = Config.from_env()
     app = FastAPI(title="trade-hub", docs_url=None, redoc_url=None, openapi_url=None)
     st = store if store is not None else SnapshotStore()
     app.state.store = st
