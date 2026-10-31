@@ -41,7 +41,10 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
+            # unconditional: this workflow only ever runs on main pushes and
+            # manual dispatch, and the {{is_default_branch}} condition failed
+            # to fire on the very first push that created main (2026-10-31).
+            type=raw,value=latest
 
       - name: Build and push
         uses: docker/build-push-action@v6
