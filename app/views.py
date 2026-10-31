@@ -218,8 +218,13 @@ def _hl_fill_lines(fills: list, n: int = 3) -> list[str]:
 def _lt_trade_lines(trades: list, n: int = 3) -> list[str]:
     lines = []
     for t in (trades or [])[:n]:
-        kind = "开" if t.get("kind_text") == "开仓" else "平"
-        act = kind + esc(t.get("side_text") or "")
+        is_exit = t.get("kind_text") == "离场"
+        # LT 的 side_text 是成交方向；离场腿显示的是被平的仓位方向（平空=买入），
+        # 与 HL 的 "Close Short" 同语义，需取反
+        side = t.get("side_text") or ""
+        if is_exit:
+            side = {"多": "空", "空": "多"}.get(side, side)
+        act = ("平" if is_exit else "开") + esc(side)
         pnl = ""
         if t.get("kind_text") == "离场" and t.get("realized_pnl") is not None:
             pnl = f"（{_fmt_signed(t.get('realized_pnl'))} U）"
