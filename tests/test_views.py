@@ -34,7 +34,7 @@ class RenderTests(unittest.TestCase):
             "496.45",
             "SOL 空",
             "三标的动态",
-            "等密集（带宽未进门槛）",
+            "距下轨",
             "打开 HL 面板",
             "打开 Lighter 面板",
             "ma.example/admin?k=hltok",
@@ -54,10 +54,10 @@ class RenderTests(unittest.TestCase):
         )
         # 止损 ✔ 只在状态行出现（仓位表只放裸价格，加标记会把行顶成两行）
         self.assertEqual(html.count("<span class='mark'>✔</span>"), 2)
-        # 持仓标记：HL symbol_state(position_side=short) 一处；LT 的 SOL verdict
-        # 本身是「持仓中」，按规则不叠加 held 标记，避免重复
-        self.assertEqual(html.count('<span class="mark">持仓空</span>'), 1)
-        self.assertEqual(html.count("持仓中"), 1)
+        # 持仓标记：合并卡里两边同向（HL short + LT held_side=-1）去重为一处
+        self.assertEqual(html.count("持仓空（HL·LT）"), 1)
+        self.assertEqual(html.count("持仓中"), 0)  # HL 有距上/下轨时 verdict 不渲染
+        self.assertEqual(html.count("距上轨"), 3)  # 三标的动态合并卡：每标的距离
         # 两卡子行都有 tick 新鲜度与止损位（tick 在止损标记之后：" · tick "）
         self.assertEqual(html.count("止损 <span class='mark'>✔</span>"), 2)
         self.assertEqual(html.count(" · tick "), 2)
@@ -118,6 +118,25 @@ class RenderTests(unittest.TestCase):
         self.assertIn("已 kill（人工）", html)
         self.assertIn("数据", html)
         self.assertIn("未刷新", html)
+
+    def test_symbols_card_falls_back_to_lt(self):
+        """HL 不可用时，三标的动态整卡退回 LT 数据（verdict 文案 + 持仓标记）。"""
+        st = SnapshotStore()
+        st.put("lt", True, 1793432641.0, normalize_lt(
+            fixtures.lt_status(), fixtures.lt_positions(), fixtures.lt_stops(), fixtures.lt_symbols(), fixtures.lt_events(),
+            records=fixtures.lt_records(),
+        ))
+        html = render_page(st.summary(stale_after_s=180), "https://a", "https://b")
+        self.assertEqual(html.count("三标的动态"), 1)
+        self.assertIn("等密集（带宽未进门槛）", html)
+        self.assertIn("持仓空（LT）", html)
+        self.assertNotIn("距上轨", html)
+
+    def test_symbols_card_hidden_without_both(self):
+        st = SnapshotStore()
+        st.put("hl", False, 1793432400.0, {}, "HTTPError: 502")
+        html = render_page(st.summary(stale_after_s=180), "https://a", "https://b")
+        self.assertNotIn("三标的动态", html)
 
     def test_fills_and_exit_price(self):
         """底部区是最近成交（带平仓盈亏），持仓表带离场价列；不再渲染运维事件。"""

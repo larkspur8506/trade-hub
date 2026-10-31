@@ -219,11 +219,61 @@ def _lt_trade_lines(trades: list, n: int = 3) -> list[str]:
     return lines or ['<div class="ev">暂无成交</div>']
 
 
-def _sym_line(name, price, dense: str, tail: str, held) -> str:
-    held_html = f' · <span class="mark">持仓{held}</span>' if held else ""
-    return (
-        f'<div class="sym">{esc(name)} <span class="v">{_fmt_money(price)} · 密集 {dense}{tail}{held_html}</span></div>'
-    )
+def _symbols_card(hl_entry: dict | None, lt_entry: dict | None) -> str:
+    """三标的动态合并卡：两边策略同源，只渲染一份。
+
+    整合两侧优点——价格/密集取较新的一边；距上/下轨是 HL 独有信息，优先展示；
+    HL 缺数时退回 LT 的 verdict 文案；持仓标记两边合并、同向去重。
+    """
+    hl_ok = bool(hl_entry and hl_entry.get("ok"))
+    lt_ok = bool(lt_entry and lt_entry.get("ok"))
+    hl_syms = {
+        s.get("coin"): s for s in ((hl_entry or {}).get("data") or {}).get("symbols") or []
+    } if hl_ok else {}
+    lt_syms = {
+        str(s.get("symbol") or "").split("_")[0]: s
+        for s in ((lt_entry or {}).get("data") or {}).get("symbols") or []
+    } if lt_ok else {}
+    order = list(hl_syms) + [c for c in lt_syms if c not in hl_syms]
+    if not order:
+        return ""
+    if hl_ok and lt_ok:
+        base_is_hl = (hl_entry.get("as_of") or 0) >= (lt_entry.get("as_of") or 0)
+    else:
+        base_is_hl = hl_ok
+    lines = []
+    for coin in order:
+        h, l = hl_syms.get(coin), lt_syms.get(coin)
+        price = ((h if base_is_hl else l) or h or l).get("price")
+        if h and h.get("dense_cnt") is not None:
+            dense = f"{esc(h.get('dense_cnt'))}/6"
+        elif l and l.get("dense_bars") is not None:
+            dense = f"{esc(l.get('dense_bars'))}/{esc(l.get('min_dense_bars'))}"
+        else:
+            dense = "—/6"
+        if h and h.get("long_trigger") is not None and h.get("short_trigger") is not None:
+            dl = _fmt_pct(_dist_pct(h.get("price"), h.get("long_trigger")))
+            ds = _fmt_pct(_dist_pct(h.get("price"), h.get("short_trigger")))
+            tail = f" · 距上轨 {dl} · 距下轨 {ds}"
+        elif l and l.get("verdict"):
+            tail = f" · {esc(l.get('verdict'))}"
+        else:
+            tail = ""
+        marks = []
+        hh = _held_text(h.get("position_side")) if h else None
+        lh = _held_text(l.get("held_side")) if l else None
+        if hh and lh and hh == lh:
+            marks.append(f"持仓{hh}（HL·LT）")
+        else:
+            if hh:
+                marks.append(f"持仓{hh}（HL）")
+            if lh:
+                marks.append(f"持仓{lh}（LT）")
+        held_html = "".join(f' · <span class="mark">{esc(m)}</span>' for m in marks)
+        lines.append(
+            f'<div class="sym">{esc(coin)} <span class="v">{_fmt_money(price)} · 密集 {dense}{tail}{held_html}</span></div>'
+        )
+    return '<div class="card"><h2>三标的动态</h2>' + "".join(lines) + "</div>"
 
 
 def _card_head(title: str, entry: dict | None, body: str) -> str:
@@ -307,16 +357,6 @@ def _hl_card(entry: dict | None) -> str:
     else:
         body.append('<div class="sub">当前空仓</div>')
 
-    body.append('<div class="sub" style="margin:2px 0 4px">三标的动态</div>')
-    for s in d.get("symbols") or []:
-        dist_l = _fmt_pct(_dist_pct(s.get("price"), s.get("long_trigger")))
-        dist_s = _fmt_pct(_dist_pct(s.get("price"), s.get("short_trigger")))
-        held = _held_text(s.get("position_side"))
-        body.append(_sym_line(
-            s.get("coin"), s.get("price"), f"{esc(s.get('dense_cnt'))}/6",
-            f" · 距上轨 {dist_l} · 距下轨 {dist_s}",
-            held,
-        ))
     body += _hl_fill_lines(d.get("fills"))
 
     perf = d.get("perf") or {}
@@ -379,17 +419,6 @@ def _lt_card(entry: dict | None) -> str:
     else:
         body.append('<div class="sub">当前空仓</div>')
 
-    body.append('<div class="sub" style="margin:2px 0 4px">三标的动态</div>')
-    for s in d.get("symbols") or []:
-        dense = f"{esc(s.get('dense_bars'))}/{esc(s.get('min_dense_bars'))}"
-        verdict = esc(s.get("verdict"))
-        # verdict 已带「持仓中」时不再叠 held 标记，避免「持仓中 · 持仓空」重复
-        held = _held_text(s.get("held_side")) if "持仓" not in verdict else None
-        body.append(_sym_line(
-            s.get("symbol"), s.get("price"), dense,
-            f" · {verdict}" if verdict else "",
-            held,
-        ))
     body += _lt_trade_lines(d.get("trades"))
     return _card_head("Lighter", entry, "".join(body))
 
@@ -408,6 +437,7 @@ def render_page(summary: dict, hl_panel_url: str, lt_panel_url: str) -> str:
         f"<header><h1>trade-hub</h1><span class='gen'>更新 {gen}</span></header>"
         + _hl_card(summary.get("hl"))
         + _lt_card(summary.get("lt"))
+        + _symbols_card(summary.get("hl"), summary.get("lt"))
         + f"<nav class='links'><a href='{html.escape(hl_panel_url, quote=True)}'>打开 HL 面板</a>"
         + f"<a href='{html.escape(lt_panel_url, quote=True)}'>打开 Lighter 面板</a></nav>"
         + f"<script>{_JS}</script></body></html>"
