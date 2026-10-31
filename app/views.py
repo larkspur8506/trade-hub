@@ -26,7 +26,7 @@ _CSS = """
   :root{ --bg:#f5f7fa; --card:#ffffff; --line:#dde3ea; --fg:#1c2430; --dim:#62707f; }
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Noto Sans CJK SC",sans-serif;padding:12px}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Noto Sans CJK SC",sans-serif;padding:12px;overscroll-behavior-y:contain}
 header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
 header h1{font-size:17px;margin:0}
 header .gen{font-size:12px;color:var(--dim)}
@@ -58,7 +58,18 @@ header .gen{font-size:12px;color:var(--dim)}
 .init{color:var(--dim);font-size:13px;padding:8px 0}
 """
 
-_JS = "try{if(location.search.indexOf('k=')>-1){history.replaceState(null,'',location.pathname)}}catch(e){}"
+_JS = (
+    "try{if(location.search.indexOf('k=')>-1){history.replaceState(null,'',location.pathname)}}catch(e){}"
+    # PWA 独立窗口没有刷新按钮、iOS 禁用系统下拉刷新——自己实现：顶部下拉 >70px 重新加载，
+    # 点「更新」时间也能刷新
+    ";(function(){var sy=0,pulling=false,hint=document.querySelector('header .gen');"
+    "document.addEventListener('touchstart',function(e){if(window.scrollY<=0){sy=e.touches[0].clientY;pulling=true;}},{passive:true});"
+    "document.addEventListener('touchmove',function(e){if(!pulling)return;var dy=e.touches[0].clientY-sy;"
+    "if(hint&&dy>40&&dy<=70){hint.textContent='松手刷新…';}"
+    "if(dy>70&&window.scrollY<=0){pulling=false;location.reload();}},{passive:true});"
+    "document.addEventListener('touchend',function(){pulling=false;if(hint)hint.textContent=hint.dataset.t||hint.textContent;},{passive:true});"
+    "if(hint){hint.dataset.t=hint.textContent;hint.addEventListener('click',function(){location.reload();});}})();"
+)
 
 _HEAD_LINKS = (
     "<link rel='apple-touch-icon' href='/apple-touch-icon.png'>"
