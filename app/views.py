@@ -183,6 +183,24 @@ def _sub_line(bits: list[str]) -> str:
     return f'<div class="sub">{" · ".join(parts)}</div>' if parts else ""
 
 
+def _mr_upnl(entry: dict | None):
+    """MR 腿（QQQ）的浮盈。只用于 HL 卡：HL 面板的 `account.unrealized_pnl`
+    不含 xyz 子账户（实测 8.7645 == 主 dex 仓位和，缺 QQQ 的 -1.96）。
+    LT 的 `/positions` 已含 QQQ 行（面板 PR #62 起），hub 端 sum 即正确，
+    **不要再加这一笔**，否则重复计算。"""
+    pos = ((entry or {}).get("data") or {}).get("mr") or {}
+    return (pos.get("pos") or {}).get("upnl")
+
+
+def _total_upnl(base, mr_upnl):
+    """卡头浮盈 = 面板聚合 + MR 腿。两个来源都缺才不渲染。"""
+    vals = [float(v) for v in (base, mr_upnl) if v is not None]
+    try:
+        return sum(vals) if vals else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _equity_line(equity, upnl) -> str:
     upnl_html = ""
     if upnl is not None:
@@ -481,7 +499,8 @@ def _hl_card(entry: dict | None) -> str:
     if d.get("feed_ok") is False:
         bits.append('<span style="color:var(--warn)">数据源异常</span>')
     body.append(_sub_line(bits))
-    body.append(_equity_line(d.get("equity"), d.get("unrealized_pnl")))
+    body.append(_equity_line(d.get("equity"),
+                             _total_upnl(d.get("unrealized_pnl"), _mr_upnl(entry))))
 
     if positions:
         rows = []
