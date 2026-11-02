@@ -203,13 +203,22 @@ def _mr_position_row(entry: dict | None) -> str | None:
     exit_px = pos.get("exit_line") or (mr.get("signal") or {}).get("exit_line")
     return (
         "<tr><td>QQQ <span class='mark'>多·MR</span></td>"
-        f"<td>{_fmt_money(pos.get('qty'))}</td>"
+        f"<td>{_fmt_qty(pos.get('qty'))}</td>"
         f"<td>{_fmt_px(pos.get('entry_price'))}</td>"
         f"<td>{_fmt_px(pos.get('mark'))}</td>"
         f"<td>{_fmt_signed(pos.get('upnl'))}</td>"
         f"<td>{_fmt_px(exit_px)}</td>"
         "<td>—</td></tr>"
     )
+
+
+def _fmt_qty(v) -> str:
+    """仓位数量：<1 保留 4 位（0.0087 显示成 0.01 会让人以为仓大了一倍）。"""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return _fmt_money(v)
+    return f"{f:,.4f}" if abs(f) < 1 else _fmt_money(f)
 
 
 def _fmt_px(v) -> str:
@@ -499,7 +508,7 @@ def _hl_card(entry: dict | None) -> str:
             side = "多" if p.get("side") == 1 else ("空" if p.get("side") == -1 else "—")
             rows.append(
                 f"<tr><td>{esc(p.get('coin'))} {side}</td>"
-                f"<td>{_fmt_money(p.get('size'))}</td>"
+                f"<td>{_fmt_qty(p.get('size'))}</td>"
                 f"<td>{_fmt_px(p.get('entry_px'))}</td>"
                 f"<td>{_fmt_px(p.get('mark_px'))}</td>"
                 f"<td>{_fmt_signed(p.get('unrealized_pnl'))}</td>"
@@ -568,7 +577,7 @@ def _lt_card(entry: dict | None) -> str:
         for p in positions:
             rows.append(
                 f"<tr><td>{esc(p.get('symbol'))} {esc(p.get('side_text'))}</td>"
-                f"<td>{_fmt_money(p.get('qty'))}</td>"
+                f"<td>{_fmt_qty(p.get('qty'))}</td>"
                 f"<td>{_fmt_px(p.get('entry_price'))}</td>"
                 f"<td>{_fmt_px(p.get('price'))}</td>"
                 f"<td>{_fmt_signed(p.get('upnl'))}</td>"
