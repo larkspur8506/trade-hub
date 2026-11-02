@@ -232,5 +232,28 @@ class RenderTests(unittest.TestCase):
         self.assertNotIn("超跌腿·", html)
 
 
+    def _store_with_mr_pos(self):
+        st = SnapshotStore()
+        data = fixtures.hl_status()
+        data["positions"] = []            # 主 dex 空仓，QQQ 在 xyz 子账户
+        data["mr"] = {"enabled": True, "state": "holding", "recon": "ok",
+                      "signal": {"rsi2": 8.4, "threshold": 10.0, "exit_line": 29327.25,
+                                 "phase": "holding"},
+                      "pos": {"qty": 0.0087, "entry_price": 28579.9, "mark": 28780.1,
+                              "upnl": 1.74, "notional": 248.65, "exit_line": 29327.25}}
+        st.put("hl", True, 1793432400.0, normalize_hl(data))
+        return st
+
+    def test_hl_card_shows_mr_position_row(self):
+        """HL 的 QQQ 在 xyz dex，主 dex positions[] 里没有 —— 聚合页要从 mr.pos 补一行。"""
+        cfg = _cfg()
+        html = render_page(self._store_with_mr_pos().summary(stale_after_s=180),
+                           cfg.hl_panel_url, cfg.lt_panel_url)
+        self.assertIn("QQQ", html)
+        self.assertIn("多·MR", html)
+        self.assertIn("28,579.90", html)
+        self.assertNotIn("当前空仓", html)
+
+
 if __name__ == "__main__":
     unittest.main()

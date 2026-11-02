@@ -177,6 +177,28 @@ def _equity_line(equity, upnl) -> str:
     return f'<div class="big">权益 {_fmt_money(equity)} U{upnl_html}</div>'
 
 
+def _mr_position_row(entry: dict | None) -> str | None:
+    """MR 腿（QQQ）的持仓行 —— 有仓才出现，止损列写「—」（这条腿按设计不挂止损）。
+
+    HL 的 QQQ 在 xyz dex 子账户里，`positions[]`（主 dex）看不到它；聚合页此前因此
+    显示「当前空仓」。数据取 `status.mr.pos`（两侧同名同义）。
+    """
+    mr = (entry or {}).get("mr") or {}
+    pos = mr.get("pos") or {}
+    if not pos:
+        return None
+    exit_px = pos.get("exit_line") or (mr.get("signal") or {}).get("exit_line")
+    return (
+        "<tr><td>QQQ <span class='mark'>多·MR</span></td>"
+        f"<td>{_fmt_money(pos.get('qty'))}</td>"
+        f"<td>{_fmt_money(pos.get('entry_price'))}</td>"
+        f"<td>{_fmt_money(pos.get('mark'))}</td>"
+        f"<td>{_fmt_signed(pos.get('upnl'))}</td>"
+        f"<td>{_fmt_money(exit_px)}</td>"
+        "<td>—</td></tr>"
+    )
+
+
 def _positions_table_hl(rows: list[str]) -> str:
     return (
         '<table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>浮盈U</th><th>离场</th><th>止损</th></tr>'
@@ -456,9 +478,16 @@ def _hl_card(entry: dict | None) -> str:
                 f"<td>{_fmt_money(p.get('exit_px'))}</td>"
                 f"<td>{_stop_cell(bool(p.get('has_stop')), p.get('stop_px'))}</td></tr>"
             )
+        mr_row = _mr_position_row(d)
+        if mr_row:
+            rows.append(mr_row)
         body.append(_positions_table_hl(rows))
     else:
-        body.append('<div class="sub">当前空仓</div>')
+        mr_row = _mr_position_row(d)
+        if mr_row:
+            body.append(_positions_table_hl([mr_row]))
+        else:
+            body.append('<div class="sub">当前空仓</div>')
 
     body += _hl_fill_lines(d.get("fills"))
 
@@ -516,7 +545,7 @@ def _lt_card(entry: dict | None) -> str:
                 f"<td>{_fmt_money(p.get('price'))}</td>"
                 f"<td>{_fmt_signed(p.get('upnl'))}</td>"
                 f"<td>{_fmt_money(p.get('exit_price'))}</td>"
-                f"<td>{_stop_cell(bool(p.get('stop_price')), p.get('stop_price'))}</td></tr>"
+                f"<td>{'—' if p.get('no_stop') else _stop_cell(bool(p.get('stop_price')), p.get('stop_price'))}</td></tr>"
             )
         body.append(_positions_table_lt(rows))
     else:
