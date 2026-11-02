@@ -33,7 +33,7 @@ class RenderTests(unittest.TestCase):
             "499.22",
             "496.45",
             "SOL 空",
-            "三标的动态",
+            "标的动态",
             "距下轨",
             "打开 HL 面板",
             "打开 Lighter 面板",
@@ -130,7 +130,7 @@ class RenderTests(unittest.TestCase):
             records=fixtures.lt_records(),
         ))
         html = render_page(st.summary(stale_after_s=180), "https://a", "https://b")
-        self.assertEqual(html.count("三标的动态"), 1)
+        self.assertEqual(html.count("标的动态"), 1)
         self.assertIn("等密集（带宽未进门槛）", html)
         self.assertIn("持仓空（LT）", html)
         self.assertNotIn("距上轨", html)
@@ -142,7 +142,7 @@ class RenderTests(unittest.TestCase):
         st = SnapshotStore()
         st.put("hl", False, 1793432400.0, {}, "HTTPError: 502")
         html = render_page(st.summary(stale_after_s=180), "https://a", "https://b")
-        self.assertNotIn("三标的动态", html)
+        self.assertNotIn("标的动态", html)
 
     def test_fills_and_exit_price(self):
         """底部区是最近成交（带平仓盈亏），持仓表带离场价列；不再渲染运维事件。"""
@@ -196,6 +196,40 @@ class RenderTests(unittest.TestCase):
         html = render_page(st.summary(stale_after_s=180), "https://a", "https://b")
         self.assertNotIn("<script>x</script>", html)
         self.assertIn("&lt;script&gt;", html)
+
+    def _store_with_mr(self, *, enabled=True, holding=False):
+        st = SnapshotStore()
+        data = fixtures.hl_status()
+        data["mr"] = {
+            "enabled": enabled, "state": "holding" if holding else "flat",
+            "recon": "ok",
+            "signal": {"rsi2": 8.48, "threshold": 10.0, "exit_line": 685.25,
+                       "next_eval_et": "2026-11-03T16:00:00-05:00",
+                       "phase": "in_window", "last_session_date": "2026-10-30"},
+        }
+        if holding:
+            data["mr"]["pos"] = {"qty": 0.0088, "entry_price": 28580.0,
+                                 "mark": 28780.0, "upnl": 1.76,
+                                 "dist_to_exit_pct": -97.61,
+                                 "exit_line": 685.25}
+        st.put("hl", True, 1793432400.0, normalize_hl(data))
+        return st
+
+    def test_mr_line_rendered_once_from_hl(self):
+        """超跌腿只渲染一份（两所同源），并标出来源；持仓时给出距入场。"""
+        cfg = _cfg()
+        html = render_page(self._store_with_mr(holding=True).summary(stale_after_s=180),
+                           cfg.hl_panel_url, cfg.lt_panel_url)
+        self.assertEqual(html.count("超跌腿·"), 1)
+        self.assertIn("超跌腿·HL", html)
+        self.assertIn("距入场", html)
+        self.assertIn("离场线 685.25", html)
+
+    def test_mr_line_absent_when_disabled(self):
+        cfg = _cfg()
+        html = render_page(self._store_with_mr(enabled=False).summary(stale_after_s=180),
+                           cfg.hl_panel_url, cfg.lt_panel_url)
+        self.assertNotIn("超跌腿·", html)
 
 
 if __name__ == "__main__":
