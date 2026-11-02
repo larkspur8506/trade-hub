@@ -382,47 +382,13 @@ def _mr_line(hl_entry: dict | None, lt_entry: dict | None) -> tuple[str, str | N
 
 
 def _render_mr(mr: dict, src: str) -> str:
-    """MR 一行：现价 · 距入场 · RSI2 · 离场线 · 距离场 · 结论（口径同两所面板）。"""
+    """MR 一行（标的动态）：空仓时回答「离开仓有多远」（现价 · RSI2/阈值 · 等什么）；
+    持仓时只留状态——现价/浮盈/离场线/距离场都在仓位表那行，再渲染一遍会被读成两份账
+    （2026-11-02 用户指出与仓位表重复）。"""
     pos = mr.get("pos") or {}
     sig = mr.get("signal") or {}
     holding = bool(pos)
     parts = []
-    mark = pos.get("mark") or mr.get("mark")
-    if mark is not None:
-        parts.append(f"现价 {_fmt_money(mark)}")
-    if holding:
-        entry = pos.get("entry_price")
-        if entry:
-            try:
-                parts.append(f"距入场 {(float(mark) / float(entry) - 1) * 100:+.2f}%")
-            except (TypeError, ValueError, ZeroDivisionError):
-                pass
-        if pos.get("qty") is not None:
-            parts.append(f"持仓多 {esc(pos.get('qty'))}")
-        upnl = pos.get("upnl")
-        if upnl is not None:
-            try:
-                parts.append(f"浮盈 {float(upnl):+.2f} U")
-            except (TypeError, ValueError):
-                pass
-    rsi = sig.get("rsi2")
-    thr = sig.get("threshold")
-    if rsi is not None:
-        try:
-            ok = thr is not None and float(rsi) < float(thr)
-            parts.append(f"RSI2 {float(rsi):.2f}{' ✔' if ok else ''}")
-        except (TypeError, ValueError):
-            parts.append(f"RSI2 {esc(rsi)}")
-    # 离场线/距离场只在持仓时有意义：空仓时它是「如果开了仓会怎样」的假想值，
-    # 摆在「等开盘」旁边会被读成已有仓位的离场价（2026-11-02 用户指出）。
-    if holding and sig.get("exit_line") is not None:
-        parts.append(f"离场线 {_fmt_money(sig.get('exit_line'))}")
-    dex = pos.get("dist_to_exit_pct") if holding else None
-    if dex is not None:
-        try:
-            parts.append(f"距离场 {float(dex):+.2f}%")
-        except (TypeError, ValueError):
-            pass
     if str(mr.get("recon") or "") == "err":
         status = "对账不平"
     elif holding:
@@ -430,11 +396,26 @@ def _render_mr(mr: dict, src: str) -> str:
     elif not mr.get("enabled"):
         status = "停用"
     else:
+        mark = mr.get("mark")
+        if mark is not None:
+            parts.append(f"现价 {_fmt_money(mark)}")
+        rsi = sig.get("rsi2")
+        thr = sig.get("threshold")
+        if rsi is not None:
+            try:
+                ok = thr is not None and float(rsi) < float(thr)
+                tail = f" / 阈 {float(thr):g}" if thr is not None else ""
+                parts.append(f"RSI2 {float(rsi):.2f}{tail}{' ✔' if ok else ''}")
+            except (TypeError, ValueError):
+                parts.append(f"RSI2 {esc(rsi)}")
         phase = str(sig.get("phase") or "")
         status = {"in_window": "窗口内等成交", "signal_ready": "等开盘",
                   "expired": "窗口已过", "no_signal": "空仓"}.get(phase, "空仓")
     body = " · ".join(parts)
-    return (f'<div class="sym">QQQ <span class="v">{body} · {esc(status)}'
+    if body:
+        return (f'<div class="sym">QQQ <span class="v">{body} · {esc(status)}'
+                f' · <span class="mark">超跌腿·{esc(src)}</span></span></div>')
+    return (f'<div class="sym">QQQ <span class="v">{esc(status)}'
             f' · <span class="mark">超跌腿·{esc(src)}</span></span></div>')
 
 

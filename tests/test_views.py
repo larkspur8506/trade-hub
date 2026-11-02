@@ -202,7 +202,7 @@ class RenderTests(unittest.TestCase):
         data = fixtures.hl_status()
         data["mr"] = {
             "enabled": enabled, "state": "holding" if holding else "flat",
-            "recon": "ok",
+            "recon": "ok", "mark": 694.09,
             "signal": {"rsi2": 8.48, "threshold": 10.0, "exit_line": 685.25,
                        "next_eval_et": "2026-11-03T16:00:00-05:00",
                        "phase": "in_window", "last_session_date": "2026-10-30"},
@@ -216,14 +216,27 @@ class RenderTests(unittest.TestCase):
         return st
 
     def test_mr_line_rendered_once_from_hl(self):
-        """超跌腿只渲染一份（两所同源），并标出来源；持仓时给出距入场。"""
+        """超跌腿只渲染一份（两所同源），并标出来源；持仓时动态行只留状态
+        （现价/浮盈/离场线都在仓位表那行，重复会被读成两份账——2026-11-02）。"""
         cfg = _cfg()
         html = render_page(self._store_with_mr(holding=True).summary(stale_after_s=180),
                            cfg.hl_panel_url, cfg.lt_panel_url)
         self.assertEqual(html.count("超跌腿·"), 1)
         self.assertIn("超跌腿·HL", html)
-        self.assertIn("距入场", html)
-        self.assertIn("离场线 685.25", html)
+        self.assertIn("持仓中", html)
+        self.assertNotIn("距入场", html)
+        self.assertNotIn("离场线 685.25", html)      # 仓位表的离场列还在，动态行不再重复
+        self.assertIn('QQQ <span class="v">持仓中', html)  # 持仓时动态行只剩状态
+
+    def test_mr_line_empty_shows_entry_distance(self):
+        """空仓时动态行的职责：离开仓有多远（现价 · RSI2/阈值）+ 在等什么。"""
+        cfg = _cfg()
+        html = render_page(self._store_with_mr(holding=False).summary(stale_after_s=180),
+                           cfg.hl_panel_url, cfg.lt_panel_url)
+        self.assertIn("现价 694.09", html)
+        self.assertIn("RSI2 8.48 / 阈 10", html)
+        self.assertIn("窗口内等成交", html)
+        self.assertNotIn("离场线", html)
 
     def test_mr_line_absent_when_disabled(self):
         cfg = _cfg()
