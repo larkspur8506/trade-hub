@@ -251,7 +251,7 @@ class RenderTests(unittest.TestCase):
                            cfg.hl_panel_url, cfg.lt_panel_url)
         self.assertIn("QQQ", html)
         self.assertIn("多·MR", html)
-        self.assertIn("28,579.90", html)
+        self.assertIn("28,580", html)   # 窄屏价格取整（≥1000 不留小数）
         self.assertNotIn("当前空仓", html)
 
 

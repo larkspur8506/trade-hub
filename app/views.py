@@ -26,6 +26,7 @@ _CSS = """
   :root{ --bg:#f5f7fa; --card:#ffffff; --line:#dde3ea; --fg:#1c2430; --dim:#62707f; }
 }
 *{box-sizing:border-box}
+html,body{max-width:100%;overflow-x:hidden}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Noto Sans CJK SC",sans-serif;padding:12px;overscroll-behavior-y:contain}
 header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
 header h1{font-size:17px;margin:0}
@@ -37,7 +38,8 @@ header .gen{font-size:12px;color:var(--dim)}
 .sub{font-size:12px;color:var(--dim);margin-bottom:8px}
 .big{font-family:var(--mono);font-size:19px;margin:2px 0 10px}
 .big .upnl{font-size:13px;margin-left:8px}
-.pos{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0 10px}
+.tbl{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.pos{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0 10px;table-layout:auto}
 .pos th{color:var(--dim);font-weight:500;text-align:right;padding:3px 4px;border-bottom:1px solid var(--line)}
 .pos td{text-align:right;padding:4px;font-family:var(--mono);border-bottom:1px solid var(--line)}
 .pos th:first-child,.pos td:first-child{text-align:left}
@@ -56,6 +58,17 @@ header .gen{font-size:12px;color:var(--dim)}
 .links{display:flex;gap:10px;margin:14px 0}
 .links a{flex:1;text-align:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 0;color:var(--fg);text-decoration:none;font-size:14px}
 .init{color:var(--dim);font-size:13px;padding:8px 0}
+/* 窄屏（iPhone 竖屏）：7 列表格在 390px 内放不下，压字号+字距，仍溢出就在卡内横滑，
+   不让整页产生横向滚动（2026-11-02 用户反馈「破窗」）。 */
+@media (max-width:480px){
+  body{padding:8px;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Noto Sans CJK SC",sans-serif}
+  .card{padding:10px}
+  .pos{font-size:11px;margin:4px 0 8px}
+  .pos th{padding:3px 2px;font-size:10.5px}
+  .pos td{padding:3px 2px}
+  .big{font-size:17px}
+  .ev{overflow-wrap:anywhere}
+}
 """
 
 _JS = (
@@ -191,27 +204,42 @@ def _mr_position_row(entry: dict | None) -> str | None:
     return (
         "<tr><td>QQQ <span class='mark'>多·MR</span></td>"
         f"<td>{_fmt_money(pos.get('qty'))}</td>"
-        f"<td>{_fmt_money(pos.get('entry_price'))}</td>"
-        f"<td>{_fmt_money(pos.get('mark'))}</td>"
+        f"<td>{_fmt_px(pos.get('entry_price'))}</td>"
+        f"<td>{_fmt_px(pos.get('mark'))}</td>"
         f"<td>{_fmt_signed(pos.get('upnl'))}</td>"
-        f"<td>{_fmt_money(exit_px)}</td>"
+        f"<td>{_fmt_px(exit_px)}</td>"
         "<td>—</td></tr>"
     )
 
 
+def _fmt_px(v) -> str:
+    """仓位表里的价格：≥1000 只留整数位（28,579.90 → 28,580），窄屏靠这个把表压进一屏。
+
+    只用于**表格显示**，不改任何计算值；<1000 的（BTC 跌到三位、SOL 等）仍保留两位小数。
+    """
+    f = None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return _fmt_money(v)
+    if f >= 1000:
+        return f"{f:,.0f}"
+    return _fmt_money(f)
+
+
 def _positions_table_hl(rows: list[str]) -> str:
     return (
-        '<table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>浮盈U</th><th>离场</th><th>止损</th></tr>'
+        '<div class="tbl"><table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>浮盈U</th><th>离场</th><th>止损</th></tr>'
         + "".join(rows)
-        + "</table>"
+        + "</table></div>"
     )
 
 
 def _positions_table_lt(rows: list[str]) -> str:
     return (
-        '<table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>浮盈U</th><th>离场</th><th>止损</th></tr>'
+        '<div class="tbl"><table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>浮盈U</th><th>离场</th><th>止损</th></tr>'
         + "".join(rows)
-        + "</table>"
+        + "</table></div>"
     )
 
 
@@ -472,10 +500,10 @@ def _hl_card(entry: dict | None) -> str:
             rows.append(
                 f"<tr><td>{esc(p.get('coin'))} {side}</td>"
                 f"<td>{_fmt_money(p.get('size'))}</td>"
-                f"<td>{_fmt_money(p.get('entry_px'))}</td>"
-                f"<td>{_fmt_money(p.get('mark_px'))}</td>"
+                f"<td>{_fmt_px(p.get('entry_px'))}</td>"
+                f"<td>{_fmt_px(p.get('mark_px'))}</td>"
                 f"<td>{_fmt_signed(p.get('unrealized_pnl'))}</td>"
-                f"<td>{_fmt_money(p.get('exit_px'))}</td>"
+                f"<td>{_fmt_px(p.get('exit_px'))}</td>"
                 f"<td>{_stop_cell(bool(p.get('has_stop')), p.get('stop_px'))}</td></tr>"
             )
         mr_row = _mr_position_row(d)
@@ -541,10 +569,10 @@ def _lt_card(entry: dict | None) -> str:
             rows.append(
                 f"<tr><td>{esc(p.get('symbol'))} {esc(p.get('side_text'))}</td>"
                 f"<td>{_fmt_money(p.get('qty'))}</td>"
-                f"<td>{_fmt_money(p.get('entry_price'))}</td>"
-                f"<td>{_fmt_money(p.get('price'))}</td>"
+                f"<td>{_fmt_px(p.get('entry_price'))}</td>"
+                f"<td>{_fmt_px(p.get('price'))}</td>"
                 f"<td>{_fmt_signed(p.get('upnl'))}</td>"
-                f"<td>{_fmt_money(p.get('exit_price'))}</td>"
+                f"<td>{_fmt_px(p.get('exit_price'))}</td>"
                 f"<td>{'—' if p.get('no_stop') else _stop_cell(bool(p.get('stop_price')), p.get('stop_price'))}</td></tr>"
             )
         body.append(_positions_table_lt(rows))
