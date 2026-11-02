@@ -244,6 +244,14 @@ class RenderTests(unittest.TestCase):
                            cfg.hl_panel_url, cfg.lt_panel_url)
         self.assertNotIn("超跌腿·", html)
 
+    def test_hl_equity_upnl_includes_mr_leg(self):
+        """卡头浮盈 = 面板聚合 + MR 腿（HL 的 account.unrealized_pnl 不含 xyz 子账户）。"""
+        cfg = _cfg()
+        # fixture：account.unrealized_pnl=4.59，mr.pos.upnl=1.76 → 6.35
+        html = render_page(self._store_with_mr(holding=True).summary(stale_after_s=180),
+                           cfg.hl_panel_url, cfg.lt_panel_url)
+        self.assertIn("浮盈 +6.35 U", html)
+
 
     def _store_with_mr_pos(self):
         st = SnapshotStore()
