@@ -354,9 +354,11 @@ def _render_mr(mr: dict, src: str) -> str:
             parts.append(f"RSI2 {float(rsi):.2f}{' ✔' if ok else ''}")
         except (TypeError, ValueError):
             parts.append(f"RSI2 {esc(rsi)}")
-    if sig.get("exit_line") is not None:
+    # 离场线/距离场只在持仓时有意义：空仓时它是「如果开了仓会怎样」的假想值，
+    # 摆在「等开盘」旁边会被读成已有仓位的离场价（2026-11-02 用户指出）。
+    if holding and sig.get("exit_line") is not None:
         parts.append(f"离场线 {_fmt_money(sig.get('exit_line'))}")
-    dex = pos.get("dist_to_exit_pct")
+    dex = pos.get("dist_to_exit_pct") if holding else None
     if dex is not None:
         try:
             parts.append(f"距离场 {float(dex):+.2f}%")
