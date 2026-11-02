@@ -251,8 +251,6 @@ def _symbols_card(hl_entry: dict | None, lt_entry: dict | None) -> str:
         for s in ((lt_entry or {}).get("data") or {}).get("symbols") or []
     } if lt_ok else {}
     order = list(hl_syms) + [c for c in lt_syms if c not in hl_syms]
-    if not order:
-        return ""
     if hl_ok and lt_ok:
         base_is_hl = (hl_entry.get("as_of") or 0) >= (lt_entry.get("as_of") or 0)
     else:
@@ -300,7 +298,83 @@ def _symbols_card(hl_entry: dict | None, lt_entry: dict | None) -> str:
         lines.append(
             f'<div class="sym">{esc(coin)} <span class="v">{_fmt_money(price)} · {dense_part}{tail}{held_html}</span></div>'
         )
-    return '<div class="card"><h2>三标的动态</h2>' + "".join(lines) + "</div>"
+    mr_line, _src = _mr_line(hl_entry, lt_entry)
+    if not lines and not mr_line:
+        return ""
+    return ('<div class="card"><h2>标的动态</h2>'
+            + "".join(lines) + mr_line + "</div>")
+
+
+def _mr_line(hl_entry: dict | None, lt_entry: dict | None) -> tuple[str, str | None]:
+    """超跌腿（QQQ）一行：两所**同一信号口径** → 只渲染一份，HL 优先。
+
+    为什么只渲染一份：两边跑的是同一个 RSI2 策略、同一个信号日，并排两行会让人
+    以为抓到了两个仓位。取 HL 的理由是它的 MR tick 是 5 分钟一次（LT 是 30 分钟）。
+    """
+    for entry, src in ((hl_entry, "HL"), (lt_entry, "LT")):
+        if not entry or not entry.get("ok"):
+            continue
+        mr = (entry.get("data") or {}).get("mr") or {}
+        pos = mr.get("pos") or {}
+        if not mr or (not mr.get("enabled") and not pos):
+            continue
+        return _render_mr(mr, src), src
+    return "", None
+
+
+def _render_mr(mr: dict, src: str) -> str:
+    """MR 一行：现价 · 距入场 · RSI2 · 离场线 · 距离场 · 结论（口径同两所面板）。"""
+    pos = mr.get("pos") or {}
+    sig = mr.get("signal") or {}
+    holding = bool(pos)
+    parts = []
+    mark = pos.get("mark") or mr.get("mark")
+    if mark is not None:
+        parts.append(f"现价 {_fmt_money(mark)}")
+    if holding:
+        entry = pos.get("entry_price")
+        if entry:
+            try:
+                parts.append(f"距入场 {(float(mark) / float(entry) - 1) * 100:+.2f}%")
+            except (TypeError, ValueError, ZeroDivisionError):
+                pass
+        if pos.get("qty") is not None:
+            parts.append(f"持仓多 {esc(pos.get('qty'))}")
+        upnl = pos.get("upnl")
+        if upnl is not None:
+            try:
+                parts.append(f"浮盈 {float(upnl):+.2f} U")
+            except (TypeError, ValueError):
+                pass
+    rsi = sig.get("rsi2")
+    thr = sig.get("threshold")
+    if rsi is not None:
+        try:
+            ok = thr is not None and float(rsi) < float(thr)
+            parts.append(f"RSI2 {float(rsi):.2f}{' ✔' if ok else ''}")
+        except (TypeError, ValueError):
+            parts.append(f"RSI2 {esc(rsi)}")
+    if sig.get("exit_line") is not None:
+        parts.append(f"离场线 {_fmt_money(sig.get('exit_line'))}")
+    dex = pos.get("dist_to_exit_pct")
+    if dex is not None:
+        try:
+            parts.append(f"距离场 {float(dex):+.2f}%")
+        except (TypeError, ValueError):
+            pass
+    if str(mr.get("recon") or "") == "err":
+        status = "对账不平"
+    elif holding:
+        status = "持仓中"
+    elif not mr.get("enabled"):
+        status = "停用"
+    else:
+        phase = str(sig.get("phase") or "")
+        status = {"in_window": "窗口内等成交", "signal_ready": "等开盘",
+                  "expired": "窗口已过", "no_signal": "空仓"}.get(phase, "空仓")
+    body = " · ".join(parts)
+    return (f'<div class="sym">QQQ <span class="v">{body} · {esc(status)}'
+            f' · <span class="mark">超跌腿·{esc(src)}</span></span></div>')
 
 
 def _card_head(title: str, entry: dict | None, body: str) -> str:

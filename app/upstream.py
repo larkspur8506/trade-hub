@@ -113,6 +113,8 @@ def normalize_hl(status: dict) -> dict:
         "mismatch": (status.get("system") or {}).get("mismatch"),
         "last_event_ts": (status.get("system") or {}).get("executor_last_event_at"),
         "panel_ts": status.get("ts"),
+        # MR 腿（QQQ）状态块：聚合页「标的动态」要渲染超跌腿一行（2026-11-02）
+        "mr": status.get("mr"),
     }
 
 
@@ -197,6 +199,8 @@ def normalize_lt(
             for e in ev[:5]
         ],
         "trades": trades,
+        # MR 腿（QQQ）：面板 `status.mr` 原样透传，聚合页只读不改（2026-11-02）
+        "mr": st.get("mr"),
         "degraded_parts": list(degraded_parts or []),
     }
 
