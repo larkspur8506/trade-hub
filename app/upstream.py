@@ -142,6 +142,8 @@ def normalize_lt(
             "upnl": p.get("upnl"),
             "upnl_pct": p.get("upnl_pct"),
             "stop_price": p.get("stop_price"),
+            # MR 腿按设计不挂止损：透传标记，聚合页显示「—」而不是红字「无」
+            "no_stop": bool(p.get("no_stop")),
             "exit_price": p.get("exit_price"),
             "notional": p.get("notional"),
             "liq_price": p.get("liq_price"),
