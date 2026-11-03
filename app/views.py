@@ -12,6 +12,7 @@ the layout. All displayed times are Beijing time (UTC+8).
 from __future__ import annotations
 
 import html
+import math
 import time
 
 _STALE_WARN_S = 600  # data older than 10 min gets an amber banner even if ok
@@ -104,6 +105,23 @@ def _fmt_money(v, nd: int = 2) -> str:
         return esc(v)
 
 
+def _decimals_for_small(f: float, nd: int) -> int:
+    """小数位不够时补位：0.0008 按 2 位会变成 0.00，看不出开了多少 / 亏了多少。
+
+    只在「按 nd 位四舍五入后恰好为 0」时补到首个有效数字后两位（0.0008 → 4 位，
+    0.00004 → 6 位），最多 10 位。正常大小的数以 nd 位原样显示，表格宽度不受影响。
+    """
+    if f == 0 or round(f, nd) != 0:
+        return nd
+    return min(int(-math.log10(abs(f))) + 2, 10)
+
+
+def _fmt_num(f: float, nd: int) -> str:
+    d = _decimals_for_small(f, nd)
+    s = f"{f:,.{d}f}"
+    return s.rstrip("0") if d > nd else s
+
+
 def _fmt_signed(v, nd: int = 2, suffix: str = "") -> str:
     if v is None:
         return "—"
@@ -112,7 +130,7 @@ def _fmt_signed(v, nd: int = 2, suffix: str = "") -> str:
     except (TypeError, ValueError):
         return esc(v)
     sign = "+" if f >= 0 else ""
-    return f"{sign}{f:,.{nd}f}{suffix}"
+    return f"{sign}{_fmt_num(f, nd)}{suffix}"
 
 
 def _fmt_pct(v, nd: int = 1) -> str:
@@ -231,12 +249,16 @@ def _mr_position_row(entry: dict | None) -> str | None:
 
 
 def _fmt_qty(v) -> str:
-    """仓位数量：<1 保留 4 位（0.0087 显示成 0.01 会让人以为仓大了一倍）。"""
+    """数量：<1 保留 4 位（0.0087 显示成 0.01 会让人以为仓大了一倍）。
+
+    再小到 4 位也只剩 0 的（QQQ 这类高价标的单笔只有 0.0008）按首个有效数字补位，
+    否则成交行会出现「开多 0.00 @ 28,579.00」这种看不出开了多少的写法。
+    """
     try:
         f = float(v)
     except (TypeError, ValueError):
         return _fmt_money(v)
-    return f"{f:,.4f}" if abs(f) < 1 else _fmt_money(f)
+    return _fmt_num(f, 2 if abs(f) >= 1 else 4)
 
 
 def _fmt_px(v) -> str:
@@ -287,7 +309,7 @@ def _hl_fill_lines(fills: list, n: int = 3) -> list[str]:
             pnl = f"（{_fmt_signed(f.get('closed_pnl'))} U）"
         lines.append(
             f'<div class="ev"><span class="t">{_fmt_time(f.get("ts"))}</span>'
-            f"{esc(f.get('coin'))} {esc(act)} {_fmt_money(f.get('sz'))} @ {_fmt_money(f.get('px'))}{pnl}</div>"
+            f"{esc(f.get('coin'))} {esc(act)} {_fmt_qty(f.get('sz'))} @ {_fmt_money(f.get('px'))}{pnl}</div>"
         )
     return lines or ['<div class="ev">暂无成交</div>']
 
@@ -307,7 +329,7 @@ def _lt_trade_lines(trades: list, n: int = 3) -> list[str]:
             pnl = f"（{_fmt_signed(t.get('realized_pnl'))} U）"
         lines.append(
             f'<div class="ev"><span class="t">{_fmt_time(t.get("ts"))}</span>'
-            f"{esc(t.get('symbol'))} {act} {_fmt_money(t.get('qty'))} @ {_fmt_money(t.get('price'))}{pnl}</div>"
+            f"{esc(t.get('symbol'))} {act} {_fmt_qty(t.get('qty'))} @ {_fmt_money(t.get('price'))}{pnl}</div>"
         )
     return lines or ['<div class="ev">暂无成交</div>']
 
