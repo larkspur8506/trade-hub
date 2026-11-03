@@ -156,7 +156,7 @@ class RenderTests(unittest.TestCase):
         # LT 离场腿的 side_text 是成交方向（买入），渲染按被平仓位方向显示「平空」
         self.assertIn("SOL 开空 1.17 @ 99.45", html)
         self.assertIn("SOL 平空 1.13 @ 102.44（-3.24 U）", html)
-        self.assertIn("SOL 开空 0.72 @ 95.60", html)
+        self.assertIn("SOL 开空 0.7170 @ 95.60", html)
         self.assertIn("SOL 平空 1.19 @ 102.73（-3.64 U）", html)
         # 成交时间是北京时间（fixture ts 1793304200 = UTC 20:03 → 北京 04:03）
         self.assertIn(">04:03</span>SOL 开空 1.17 @ 99.45", html)
@@ -179,6 +179,26 @@ class RenderTests(unittest.TestCase):
         st.put("hl", True, 1793432400.0, normalize_hl({**fixtures.hl_status(), "fills": []}))
         html2 = render_page(st.summary(stale_after_s=180), cfg.hl_panel_url, cfg.lt_panel_url)
         self.assertIn("暂无成交", html2)
+
+    def test_trade_qty_small_not_zero(self):
+        """QQQ 这类高价标的单笔数量 0.0008 曾经被 2 位小数截成「开多 0.00」。"""
+        st = _store_with_both()
+        hl = st.get("hl")
+        assert hl is not None
+        hl["data"]["fills"] = [
+            {"ts": 1793629926.0, "coin": "xyz:XYZ100", "side": 1, "sz": 0.0008, "px": 28579.0,
+             "fee": 0.002, "fee_token": "USDC", "dir": "Open Long", "closed_pnl": 0.0, "reduce_only": False},
+            {"ts": 1793629800.0, "coin": "xyz:XYZ100", "side": 1, "sz": 0.00004, "px": 28570.0,
+             "fee": 0.0, "fee_token": "USDC", "dir": "Close Long", "closed_pnl": 0.0, "reduce_only": True},
+        ]
+        lt = st.get("lt")
+        assert lt is not None
+        lt["data"]["trades"][0]["qty"] = 0.0007
+        html = render_page(st.summary(stale_after_s=180), "https://a", "https://b")
+        self.assertIn("xyz:XYZ100 开多 0.0008 @ 28,579.00", html)
+        self.assertIn("xyz:XYZ100 平多 0.00004 @ 28,570.00", html)
+        self.assertNotIn(" 0.00 @", html)
+        self.assertIn("0.0007 @", html)
 
     def test_trade_symbol_escaped(self):
         st = _store_with_both()
