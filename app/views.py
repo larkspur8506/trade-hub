@@ -68,6 +68,7 @@ header .gen{font-size:12px;color:var(--dim)}
   .pos th{padding:3px 2px;font-size:10.5px}
   .pos td{padding:3px 2px}
   .big{font-size:17px}
+  .sym{font-size:12px;letter-spacing:-0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ev{overflow-wrap:anywhere}
 }
 """
@@ -488,10 +489,10 @@ def _dist_pct(price, trigger) -> float | None:
 
 
 def _format_breakout_track(price, long_trigger, short_trigger) -> str:
-    """按方案 A 格式化多空轨道距离：
+    """按方案 A 格式化多空轨道距离（紧凑文案以保证手机窄屏单行不折行）：
 
-    - 距开多：现价 < 上轨 -> 距开多 +x.x%（需上涨）；现价 >= 上轨 -> 已破上轨 +x.x%
-    - 距开空：现价 > 下轨 -> 距开空 -y.y%（需下跌）；现价 <= 下轨 -> 已破下轨 -y.y%
+    - 破位/越过：破上 +x.x% / 破下 -y.y%
+    - 距离：距多 +x.x% / 距空 -y.y%
     """
     try:
         p = float(price)
@@ -503,14 +504,14 @@ def _format_breakout_track(price, long_trigger, short_trigger) -> str:
         return ""
 
     if p >= t_long:
-        dl_str = f"已破上轨 +{(p / t_long - 1) * 100:.1f}%"
+        dl_str = f"破上 +{(p / t_long - 1) * 100:.1f}%"
     else:
-        dl_str = f"距开多 +{(t_long / p - 1) * 100:.1f}%"
+        dl_str = f"距多 +{(t_long / p - 1) * 100:.1f}%"
 
     if p <= t_short:
-        ds_str = f"已破下轨 -{(1 - p / t_short) * 100:.1f}%"
+        ds_str = f"破下 -{(1 - p / t_short) * 100:.1f}%"
     else:
-        ds_str = f"距开空 -{(1 - t_short / p) * 100:.1f}%"
+        ds_str = f"距空 -{(1 - t_short / p) * 100:.1f}%"
 
     return f" · {dl_str} · {ds_str}"
 
