@@ -68,6 +68,7 @@ header .gen{font-size:12px;color:var(--dim)}
   .pos th{padding:3px 2px;font-size:10.5px}
   .pos td{padding:3px 2px}
   .big{font-size:17px}
+  .sym{font-size:12px;letter-spacing:-0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ev{overflow-wrap:anywhere}
 }
 """
@@ -386,9 +387,7 @@ def _symbols_card(hl_entry: dict | None, lt_entry: dict | None) -> str:
         else:
             dense_part = f"密集 {dense}"
         if not held and h and h.get("long_trigger") is not None and h.get("short_trigger") is not None:
-            dl = _fmt_pct(_dist_pct(h.get("price"), h.get("long_trigger")))
-            ds = _fmt_pct(_dist_pct(h.get("price"), h.get("short_trigger")))
-            tail = f" · 距上轨 {dl} · 距下轨 {ds}"
+            tail = _format_breakout_track(h.get("price"), h.get("long_trigger"), h.get("short_trigger"))
         elif verdict:
             tail = f" · {esc(verdict)}"
         else:
@@ -487,6 +486,34 @@ def _dist_pct(price, trigger) -> float | None:
     if p == 0:
         return None
     return (t - p) / p
+
+
+def _format_breakout_track(price, long_trigger, short_trigger) -> str:
+    """按方案 A 格式化多空轨道距离（紧凑文案以保证手机窄屏单行不折行）：
+
+    - 破位/越过：破上 +x.x% / 破下 -y.y%
+    - 距离：距多 +x.x% / 距空 -y.y%
+    """
+    try:
+        p = float(price)
+        t_long = float(long_trigger)
+        t_short = float(short_trigger)
+    except (TypeError, ValueError):
+        return ""
+    if p == 0:
+        return ""
+
+    if p >= t_long:
+        dl_str = f"破上 +{(p / t_long - 1) * 100:.1f}%"
+    else:
+        dl_str = f"距多 +{(t_long / p - 1) * 100:.1f}%"
+
+    if p <= t_short:
+        ds_str = f"破下 -{(1 - p / t_short) * 100:.1f}%"
+    else:
+        ds_str = f"距空 -{(1 - t_short / p) * 100:.1f}%"
+
+    return f" · {dl_str} · {ds_str}"
 
 
 def _hl_card(entry: dict | None) -> str:

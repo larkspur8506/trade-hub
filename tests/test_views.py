@@ -34,7 +34,7 @@ class RenderTests(unittest.TestCase):
             "496.45",
             "SOL 空",
             "标的动态",
-            "距下轨",
+            "距多",
             "打开 HL 面板",
             "打开 Lighter 面板",
             "ma.example/admin?k=hltok",
@@ -60,8 +60,9 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(html.count("持仓空（HL·LT）"), 1)
         self.assertEqual(html.count(" · 持仓中"), 1)
         self.assertEqual(html.count(" · 密集 "), 2)
-        self.assertEqual(html.count("距上轨"), 2)
-        # 两卡子行都有 tick 新鲜度与止损位（tick 在止损标记之后：" · tick "）
+        self.assertEqual(html.count("距多"), 2)
+        self.assertEqual(html.count("破下"), 2)
+        # 两卡子行都有 tick 新鲜度与止损位（tick 在止损标记之后：' · tick '）
         self.assertEqual(html.count("止损 <span class='mark'>✔</span>"), 2)
         self.assertEqual(html.count(" · tick "), 2)
         # 两卡权益行都带浮盈
@@ -294,6 +295,21 @@ class RenderTests(unittest.TestCase):
         self.assertIn("多·MR", html)
         self.assertIn("28,580", html)   # 窄屏价格取整（≥1000 不留小数）
         self.assertNotIn("当前空仓", html)
+
+    def test_format_breakout_track_variants(self):
+        """方案 A 多空轨道距离指示器单测。"""
+        from app.views import _format_breakout_track
+        # 1. 现价在两轨之间（震荡）
+        self.assertEqual(_format_breakout_track(100.0, 105.0, 95.0), " · 距多 +5.0% · 距空 -5.0%")
+        # 2. 现价向上突破上轨（越过上轨，例如当前 ETH）
+        self.assertEqual(_format_breakout_track(110.0, 100.0, 90.0), " · 破上 +10.0% · 距空 -18.2%")
+        # 3. 现价向下跌破下轨（越过下轨）
+        self.assertEqual(_format_breakout_track(80.0, 100.0, 90.0), " · 距多 +25.0% · 破下 -11.1%")
+        # 4. 边界/异常输入
+        self.assertEqual(_format_breakout_track(0, 100, 90), "")
+        self.assertEqual(_format_breakout_track(None, 100, 90), "")
+
+
 
 
 if __name__ == "__main__":
