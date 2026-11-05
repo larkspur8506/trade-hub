@@ -386,9 +386,7 @@ def _symbols_card(hl_entry: dict | None, lt_entry: dict | None) -> str:
         else:
             dense_part = f"密集 {dense}"
         if not held and h and h.get("long_trigger") is not None and h.get("short_trigger") is not None:
-            dl = _fmt_pct(_dist_pct(h.get("price"), h.get("long_trigger")))
-            ds = _fmt_pct(_dist_pct(h.get("price"), h.get("short_trigger")))
-            tail = f" · 距上轨 {dl} · 距下轨 {ds}"
+            tail = _format_breakout_track(h.get("price"), h.get("long_trigger"), h.get("short_trigger"))
         elif verdict:
             tail = f" · {esc(verdict)}"
         else:
@@ -487,6 +485,34 @@ def _dist_pct(price, trigger) -> float | None:
     if p == 0:
         return None
     return (t - p) / p
+
+
+def _format_breakout_track(price, long_trigger, short_trigger) -> str:
+    """按方案 A 格式化多空轨道距离：
+
+    - 距开多：现价 < 上轨 -> 距开多 +x.x%（需上涨）；现价 >= 上轨 -> 已破上轨 +x.x%
+    - 距开空：现价 > 下轨 -> 距开空 -y.y%（需下跌）；现价 <= 下轨 -> 已破下轨 -y.y%
+    """
+    try:
+        p = float(price)
+        t_long = float(long_trigger)
+        t_short = float(short_trigger)
+    except (TypeError, ValueError):
+        return ""
+    if p == 0:
+        return ""
+
+    if p >= t_long:
+        dl_str = f"已破上轨 +{(p / t_long - 1) * 100:.1f}%"
+    else:
+        dl_str = f"距开多 +{(t_long / p - 1) * 100:.1f}%"
+
+    if p <= t_short:
+        ds_str = f"已破下轨 -{(1 - p / t_short) * 100:.1f}%"
+    else:
+        ds_str = f"距开空 -{(1 - t_short / p) * 100:.1f}%"
+
+    return f" · {dl_str} · {ds_str}"
 
 
 def _hl_card(entry: dict | None) -> str:
