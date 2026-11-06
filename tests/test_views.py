@@ -8,6 +8,13 @@ from . import fixtures
 from .test_upstream import _cfg
 
 
+def _text(html: str) -> str:
+    """去标签后的可见文本：断言文案不被样式标记（着色 span）牵连。"""
+    import re
+    body = html.split("<body>", 1)[-1].split("<script>", 1)[0]
+    return re.sub(r"<[^>]+>", "", body)
+
+
 def _store_with_both() -> SnapshotStore:
     st = SnapshotStore()
     st.put("hl", True, 1793432400.0, normalize_hl(fixtures.hl_status()))
@@ -26,6 +33,7 @@ class RenderTests(unittest.TestCase):
             cfg.hl_panel_url,
             cfg.lt_panel_url,
         )
+        html = html + _text(html)
         for needle in (
             "trade-hub",
             "Hyperliquid",
@@ -66,7 +74,7 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(html.count("止损 <span class='mark'>✔</span>"), 2)
         self.assertEqual(html.count(" · tick "), 2)
         # 两卡权益行都带浮盈
-        self.assertEqual(html.count("<span class=\"upnl\">浮盈 "), 2)
+        self.assertEqual(html.count('<span class="upnl '), 2)
 
     def test_head_links_are_local_icons(self):
         cfg = _cfg()
@@ -155,12 +163,15 @@ class RenderTests(unittest.TestCase):
         )
         # 成交行：HL 最新先是开空腿，再是带已实现盈亏的平空腿；LT 同构。
         # LT 离场腿的 side_text 是成交方向（买入），渲染按被平仓位方向显示「平空」
-        self.assertIn("SOL 开空 1.17 @ 99.45", html)
-        self.assertIn("SOL 平空 1.13 @ 102.44（-3.24 U）", html)
-        self.assertIn("SOL 开空 0.7170 @ 95.60", html)
-        self.assertIn("SOL 平空 1.19 @ 102.73（-3.64 U）", html)
+        txt = _text(html)
+        self.assertIn("SOL 开空 1.17 @ 99.45", txt)
+        self.assertIn("SOL 平空 1.13 @ 102.44-3.24 U", txt)
+        self.assertIn("SOL 开空 0.7170 @ 95.60", txt)
+        self.assertIn("SOL 平空 1.19 @ 102.73-3.64 U", txt)
+        # 平仓盈亏单独右对齐并按正负着色
+        self.assertIn('<span class="pl down">-3.24 U</span>', html)
         # 成交时间是北京时间（fixture ts 1793304200 = UTC 20:03 → 北京 04:03）
-        self.assertIn(">04:03</span>SOL 开空 1.17 @ 99.45", html)
+        self.assertIn("04:03SOL 开空 1.17 @ 99.45", txt)
         # 止损列裸价格：有 <td>104.95</td>，不再带 ✔
         self.assertIn("<td>104.95</td>", html)
         self.assertNotIn("<td>104.95 <span", html)
@@ -196,10 +207,11 @@ class RenderTests(unittest.TestCase):
         assert lt is not None
         lt["data"]["trades"][0]["qty"] = 0.0007
         html = render_page(st.summary(stale_after_s=180), "https://a", "https://b")
-        self.assertIn("xyz:XYZ100 开多 0.0008 @ 28,579.00", html)
-        self.assertIn("xyz:XYZ100 平多 0.00004 @ 28,570.00", html)
-        self.assertNotIn(" 0.00 @", html)
-        self.assertIn("0.0007 @", html)
+        txt = _text(html)
+        self.assertIn("xyz:XYZ100 开多 0.0008 @ 28,579.00", txt)
+        self.assertIn("xyz:XYZ100 平多 0.00004 @ 28,570.00", txt)
+        self.assertNotIn(" 0.00 @", txt)
+        self.assertIn("0.0007 @", txt)
 
     def test_trade_symbol_escaped(self):
         st = _store_with_both()
@@ -295,6 +307,23 @@ class RenderTests(unittest.TestCase):
         self.assertIn("多·MR", html)
         self.assertIn("28,580", html)   # 窄屏价格取整（≥1000 不留小数）
         self.assertNotIn("当前空仓", html)
+
+    def test_pnl_coloring_and_shared_columns(self):
+        """P1 视觉：盈亏按正负着色、方向标记多绿空红、两卡共用固定列宽表结构。"""
+        cfg = _cfg()
+        html = render_page(_store_with_both().summary(stale_after_s=180),
+                           cfg.hl_panel_url, cfg.lt_panel_url)
+        self.assertIn('<span class="upnl up">浮盈 +4.59 U</span>', html)
+        self.assertIn('<td><span class="up">+4.59</span></td>', html)
+        self.assertEqual(html.count("<span class='mark short'>空</span>"), 2)
+        self.assertEqual(html.count('<colgroup><col class="c0">'), 2)
+        self.assertIn("table-layout:fixed", html)
+        # 止损 ✔ 不用多空绿：状态行的 mark 走中性强调色
+        self.assertIn(".sub .mark{color:var(--accent)}", html)
+        from app.views import _sign_cls
+        self.assertEqual(_sign_cls(0), "")
+        self.assertEqual(_sign_cls(None), "")
+        self.assertEqual(_sign_cls(-0.01), "down")
 
     def test_format_breakout_track_variants(self):
         """方案 A 多空轨道距离指示器单测。"""
