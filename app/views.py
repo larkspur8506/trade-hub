@@ -110,18 +110,28 @@ details.leg .lg b{color:var(--fg);font-weight:600}
 
 _JS = (
     "try{if(location.search.indexOf('k=')>-1){history.replaceState(null,'',location.pathname)}}catch(e){}"
-    # PWA 独立窗口没有刷新按钮、iOS 禁用系统下拉刷新——自己实现：顶部下拉 >70px 重新加载，
-    # 点「更新」时间也能刷新
-    ";(function(){var sy=0,pulling=false,hint=document.querySelector('header .gen');"
+    # PWA 独立窗口无刷新按钮、iOS 禁用系统下拉刷新：
+    # 1) 顶部下拉 >70px 或点「更新」胶囊 → fetch /api/fragment 局部替换卡片（复用连接，免整页 reload）
+    # 2) 前台每 60s 自动静默刷新（与后台轮询同周期），切回前台且距上次 >45s 立即刷一次
+    # 3) 页面超过 2 分钟未刷新，「更新」胶囊变琥珀提示
+    ";(function(){var sy=0,pulling=false,busy=false,hint=document.querySelector('header .gen'),main=document.getElementById('cards');"
+    "var ck=function(){if(!hint)return;var ts=+hint.dataset.ts||0;hint.classList.toggle('old',ts>0&&Date.now()/1000-ts>120);};"
+    "var rf=function(manual){if(busy)return;busy=true;"
+    "if(manual&&hint){hint.textContent='刷新中…';}"
+    "fetch('/api/fragment'+location.search,{credentials:'same-origin',cache:'no-store'})"
+    ".then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})"
+    ".then(function(d){if(main&&d.html){var open=[];main.querySelectorAll('details[open]').forEach(function(e,i){open.push(i);});"
+    "main.innerHTML=d.html;main.querySelectorAll('details').forEach(function(e,i){if(open.indexOf(i)>-1)e.open=true;});}"
+    "if(hint&&d.gen){hint.textContent='更新 '+d.gen;hint.dataset.t=hint.textContent;hint.dataset.ts=d.ts;ck();}busy=false;})"
+    ".catch(function(){busy=false;if(manual)location.reload();});};"
     "document.addEventListener('touchstart',function(e){if(window.scrollY<=0){sy=e.touches[0].clientY;pulling=true;}},{passive:true});"
     "document.addEventListener('touchmove',function(e){if(!pulling)return;var dy=e.touches[0].clientY-sy;"
     "if(hint&&dy>40&&dy<=70){hint.textContent='松手刷新…';}"
-    "if(dy>70&&window.scrollY<=0){pulling=false;location.reload();}},{passive:true});"
-    "document.addEventListener('touchend',function(){pulling=false;if(hint)hint.textContent=hint.dataset.t||hint.textContent;},{passive:true});"
-    "if(hint){hint.dataset.t=hint.textContent;hint.addEventListener('click',function(){location.reload();});"
-    # 页面开着不刷新（PWA 挂后台回来）超过 2 分钟，「更新」时间变琥珀提示
-    "var ck=function(){var ts=+hint.dataset.ts||0;hint.classList.toggle('old',ts>0&&Date.now()/1000-ts>120);};"
-    "ck();setInterval(ck,15000);document.addEventListener('visibilitychange',ck);}})();"
+    "if(dy>70&&window.scrollY<=0){pulling=false;rf(true);}},{passive:true});"
+    "document.addEventListener('touchend',function(){pulling=false;if(hint&&!busy)hint.textContent=hint.dataset.t||hint.textContent;},{passive:true});"
+    "if(hint){hint.dataset.t=hint.textContent;hint.addEventListener('click',function(){rf(true);});ck();"
+    "setInterval(function(){ck();if(!document.hidden)rf(false);},60000);"
+    "document.addEventListener('visibilitychange',function(){ck();if(!document.hidden&&hint&&Date.now()/1000-(+hint.dataset.ts||0)>45)rf(false);});}})();"
 )
 
 _HEAD_LINKS = (
@@ -741,9 +751,20 @@ def _lt_card(entry: dict | None, now_ts: float | None = None) -> str:
     return _card_head("Lighter", entry, "".join(body))
 
 
-def render_page(summary: dict, hl_panel_url: str, lt_panel_url: str) -> str:
+def render_cards_fragment(summary: dict) -> dict:
+    """局部刷新接口返回的数据包：三张卡片 HTML 片段 + 头部时间文本与时间戳。"""
     now_ts = summary.get("generated_at", time.time())
     gen = time.strftime("%H:%M:%S", time.gmtime(now_ts + 8 * 3600))
+    cards_html = (
+        _hl_card(summary.get("hl"), now_ts=now_ts)
+        + _lt_card(summary.get("lt"), now_ts=now_ts)
+        + _symbols_card(summary.get("hl"), summary.get("lt"))
+    )
+    return {"ts": int(now_ts), "gen": gen, "html": cards_html}
+
+
+def render_page(summary: dict, hl_panel_url: str, lt_panel_url: str) -> str:
+    frag = render_cards_fragment(summary)
     return (
         "<!doctype html><html lang='zh'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
@@ -753,10 +774,8 @@ def render_page(summary: dict, hl_panel_url: str, lt_panel_url: str) -> str:
         "<title>trade-hub</title>"
         f"{_HEAD_LINKS}"
         f"<style>{_CSS}</style></head><body>"
-        f"<header><h1>trade-hub</h1><span class='gen' data-ts='{int(now_ts)}'>更新 {gen}</span></header>"
-        + _hl_card(summary.get("hl"), now_ts=now_ts)
-        + _lt_card(summary.get("lt"), now_ts=now_ts)
-        + _symbols_card(summary.get("hl"), summary.get("lt"))
+        f"<header><h1>trade-hub</h1><span class='gen' data-ts='{frag['ts']}'>更新 {frag['gen']}</span></header>"
+        f"<main id='cards'>{frag['html']}</main>"
         + f"<nav class='links'><a href='{html.escape(hl_panel_url, quote=True)}'>打开 HL 面板</a>"
         + f"<a href='{html.escape(lt_panel_url, quote=True)}'>打开 Lighter 面板</a></nav>"
         + f"<script>{_JS}</script></body></html>"
