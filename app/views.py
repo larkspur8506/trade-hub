@@ -54,20 +54,24 @@ header .gen.old{color:var(--warn);border-color:var(--warn)}
 .up{color:var(--up)} .down{color:var(--down)}
 .tbl{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .pos{width:100%;border-collapse:collapse;font-size:13px;margin:0 0 10px;table-layout:fixed}
-.pos col.c0{width:21%} .pos col.c1{width:14%}
+.pos col.c0{width:25%} .pos col.c1{width:14%}
 .pos th{color:var(--faint);font-weight:500;font-size:11.5px;text-align:right;padding:4px 4px 5px;border-bottom:1px solid var(--line);white-space:nowrap}
 .pos td{text-align:right;padding:6px 4px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pos tr:last-child td{border-bottom:none}
 .pos th:first-child,.pos td:first-child{text-align:left}
 .pos th:first-child,.pos td:first-child{padding-left:0} .pos th:last-child,.pos td:last-child{padding-right:0}
-.pos td:first-child{font-weight:600}
-.pos .mark{font-weight:500;font-size:.92em}
+.pos td:first-child{font-weight:600;letter-spacing:-0.3px}
+.pos .mark{font-weight:500;font-size:.88em}
 .pos .mark.long,.act.long{color:var(--up)} .pos .mark.short,.act.short{color:var(--down)}
 .pos .miss{color:var(--bad)}
 .sym{font-size:13px;padding:7px 0;border-bottom:1px solid var(--line);font-weight:600}
-.sym:last-child{border-bottom:none}
+.sym:last-of-type{border-bottom:none}
 .sym .v{color:var(--dim);font-weight:400}
 .sym .mark{color:var(--accent)}
+details.leg{margin-top:4px;padding-top:4px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--dim)}
+details.leg summary{cursor:pointer;color:var(--faint);user-select:none;padding:2px 0}
+details.leg .lg{padding:4px 0 2px;line-height:1.55}
+details.leg .lg b{color:var(--fg);font-weight:600}
 .sec{font-size:11px;color:var(--faint);margin:4px 0 2px;letter-spacing:.3px}
 .ev{display:flex;align-items:baseline;gap:8px;font-size:12.5px;color:var(--fg);padding:4px 0;border-top:1px dashed var(--line);white-space:nowrap}
 .ev .t{color:var(--faint);flex:none;min-width:2.9em}
@@ -98,7 +102,7 @@ header .gen.old{color:var(--warn);border-color:var(--warn)}
 /* 更窄（iPhone SE/mini 360-375px）：再压一档，保证价格数字不被省略号截断 */
 @media (max-width:380px){
   .pos{font-size:10.5px;letter-spacing:-0.3px}
-  .pos col.c0{width:19%} .pos col.c1{width:13%}
+  .pos col.c0{width:25%} .pos col.c1{width:13%}
   .pos th{font-size:10px}
   .pos td{padding:5px 1px}
 }
@@ -203,13 +207,21 @@ def _fmt_pct(v, nd: int = 1) -> str:
         return esc(v)
 
 
-def _fmt_time(ts) -> str:
+def _fmt_time(ts, now_ts: float | None = None) -> str:
     if ts is None:
         return "—"
     try:
-        return time.strftime("%H:%M", time.gmtime(float(ts) + 8 * 3600))
+        t_bj = float(ts) + 8 * 3600
     except (TypeError, ValueError):
         return "—"
+    hm = time.strftime("%H:%M", time.gmtime(t_bj))
+    ref = float(now_ts) if now_ts is not None else time.time()
+    day_diff = int((ref + 8 * 3600) // 86400) - int(t_bj // 86400)
+    if day_diff == 0:
+        return hm
+    if day_diff == 1:
+        return f"昨 {hm}"
+    return time.strftime("%m-%d %H:%M", time.gmtime(t_bj))
 
 
 def _fmt_age(age_s) -> str:
@@ -300,7 +312,7 @@ def _mr_position_row(entry: dict | None) -> str | None:
         return None
     exit_px = pos.get("exit_line") or (mr.get("signal") or {}).get("exit_line")
     return (
-        f"<tr><td>QQQ {_side_mark('多', '·MR')}</td>"
+        f"<tr><td>QQQ·NDX {_side_mark('多', '·MR')}</td>"
         f"<td>{_fmt_qty(pos.get('qty'))}</td>"
         f"<td>{_fmt_px(pos.get('entry_price'))}</td>"
         f"<td>{_fmt_px(pos.get('mark'))}</td>"
@@ -361,25 +373,25 @@ _HL_DIR = {
 }
 
 
-def _hl_fill_lines(fills: list, n: int = 3) -> list[str]:
+def _hl_fill_lines(fills: list, n: int = 3, now_ts: float | None = None) -> list[str]:
     lines = []
     for f in (fills or [])[:n]:
         act = _HL_DIR.get(f.get("dir") or "", f.get("dir") or "—")
         pnl = None
         if str(f.get("dir") or "").startswith("Close") and f.get("closed_pnl") is not None:
             pnl = f.get("closed_pnl")
-        lines.append(_trade_line(f.get("ts"), f.get("coin"), act, f.get("sz"), f.get("px"), pnl))
+        lines.append(_trade_line(f.get("ts"), f.get("coin"), act, f.get("sz"), f.get("px"), pnl, now_ts=now_ts))
     return _trades_block(lines)
 
 
-def _trade_line(ts, sym, act: str, qty, px, pnl) -> str:
+def _trade_line(ts, sym, act: str, qty, px, pnl, now_ts: float | None = None) -> str:
     """成交行：时间 | 标的 + 开/平多空（多绿空红）+ 数量 @ 价 | 平仓腿盈亏右对齐着色。"""
     cls = "long" if act.endswith("多") else ("short" if act.endswith("空") else "")
     pl = ""
     if pnl is not None:
         pl = f'<span class="{("pl " + _sign_cls(pnl)).strip()}">{_fmt_signed(pnl)} U</span>'
     return (
-        f'<div class="ev"><span class="t">{_fmt_time(ts)}</span>'
+        f'<div class="ev"><span class="t">{_fmt_time(ts, now_ts)}</span>'
         f'<span class="tx">{esc(sym)} <span class="act {cls}">{esc(act)}</span> '
         f'<span class="q">{_fmt_qty(qty)} @ {_fmt_money(px)}</span></span>{pl}</div>'
     )
@@ -390,7 +402,7 @@ def _trades_block(lines: list[str]) -> list[str]:
     return [head] + (lines or ['<div class="ev"><span class="tx">暂无成交</span></div>'])
 
 
-def _lt_trade_lines(trades: list, n: int = 3) -> list[str]:
+def _lt_trade_lines(trades: list, n: int = 3, now_ts: float | None = None) -> list[str]:
     lines = []
     for t in (trades or [])[:n]:
         is_exit = t.get("kind_text") == "离场"
@@ -403,8 +415,17 @@ def _lt_trade_lines(trades: list, n: int = 3) -> list[str]:
         pnl = None
         if is_exit and t.get("realized_pnl") is not None:
             pnl = t.get("realized_pnl")
-        lines.append(_trade_line(t.get("ts"), t.get("symbol"), act, t.get("qty"), t.get("price"), pnl))
+        lines.append(_trade_line(t.get("ts"), t.get("symbol"), act, t.get("qty"), t.get("price"), pnl, now_ts=now_ts))
     return _trades_block(lines)
+
+
+_LEGEND_HTML = (
+    '<details class="leg"><summary>图例说明</summary><div class="lg">'
+    "<div><b>K线密集 x/6</b>：近 6 根 4h K 线均线带宽达标的根数（满 6 根允许突破入场）</div>"
+    "<div><b>轨道距离 / 越线</b>：现价距上/下突破触发线的百分比；已越过触发线显示为越线幅度</div>"
+    "<div><b>RSI2 均值回归</b>：QQQ 日线超跌反弹独立策略（HL 仓位用 QQQ·NDX 纳指100指数口径）</div>"
+    "</div></details>"
+)
 
 
 def _symbols_card(hl_entry: dict | None, lt_entry: dict | None) -> str:
@@ -472,7 +493,7 @@ def _symbols_card(hl_entry: dict | None, lt_entry: dict | None) -> str:
     if not lines and not mr_line:
         return ""
     return ('<div class="card"><h2>标的动态</h2>'
-            + "".join(lines) + mr_line + "</div>")
+            + "".join(lines) + mr_line + _LEGEND_HTML + "</div>")
 
 
 def _mr_line(hl_entry: dict | None, lt_entry: dict | None) -> tuple[str, str | None]:
@@ -588,7 +609,7 @@ def _format_breakout_track(price, long_trigger, short_trigger) -> str:
     return f" · {dl_str} · {ds_str}"
 
 
-def _hl_card(entry: dict | None) -> str:
+def _hl_card(entry: dict | None, now_ts: float | None = None) -> str:
     if entry is None:
         return _init_card("Hyperliquid")
     if not entry.get("ok"):
@@ -647,7 +668,7 @@ def _hl_card(entry: dict | None) -> str:
         else:
             body.append('<div class="sub">当前空仓</div>')
 
-    body += _hl_fill_lines(d.get("fills"))
+    body += _hl_fill_lines(d.get("fills"), now_ts=now_ts)
 
     perf = d.get("perf") or {}
     if perf.get("n"):
@@ -658,7 +679,7 @@ def _hl_card(entry: dict | None) -> str:
     return _card_head("Hyperliquid", entry, "".join(body))
 
 
-def _lt_card(entry: dict | None) -> str:
+def _lt_card(entry: dict | None, now_ts: float | None = None) -> str:
     if entry is None:
         return _init_card("Lighter")
     if not entry.get("ok"):
@@ -710,12 +731,19 @@ def _lt_card(entry: dict | None) -> str:
     else:
         body.append('<div class="sub">当前空仓</div>')
 
-    body += _lt_trade_lines(d.get("trades"))
+    body += _lt_trade_lines(d.get("trades"), now_ts=now_ts)
+    perf = d.get("perf") or {}
+    if perf.get("n"):
+        body.append(
+            f'<div class="perf">结单 {esc(perf.get("n"))} 笔 · 胜率 {_fmt_pct(perf.get("win_rate"))}'
+            f' · 累计平仓 {_pnl_span(perf.get("realized_total"), " U")}</div>'
+        )
     return _card_head("Lighter", entry, "".join(body))
 
 
 def render_page(summary: dict, hl_panel_url: str, lt_panel_url: str) -> str:
-    gen = time.strftime("%H:%M:%S", time.gmtime(summary.get("generated_at", time.time()) + 8 * 3600))
+    now_ts = summary.get("generated_at", time.time())
+    gen = time.strftime("%H:%M:%S", time.gmtime(now_ts + 8 * 3600))
     return (
         "<!doctype html><html lang='zh'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
@@ -725,9 +753,9 @@ def render_page(summary: dict, hl_panel_url: str, lt_panel_url: str) -> str:
         "<title>trade-hub</title>"
         f"{_HEAD_LINKS}"
         f"<style>{_CSS}</style></head><body>"
-        f"<header><h1>trade-hub</h1><span class='gen' data-ts='{int(summary.get('generated_at', time.time()))}'>更新 {gen}</span></header>"
-        + _hl_card(summary.get("hl"))
-        + _lt_card(summary.get("lt"))
+        f"<header><h1>trade-hub</h1><span class='gen' data-ts='{int(now_ts)}'>更新 {gen}</span></header>"
+        + _hl_card(summary.get("hl"), now_ts=now_ts)
+        + _lt_card(summary.get("lt"), now_ts=now_ts)
         + _symbols_card(summary.get("hl"), summary.get("lt"))
         + f"<nav class='links'><a href='{html.escape(hl_panel_url, quote=True)}'>打开 HL 面板</a>"
         + f"<a href='{html.escape(lt_panel_url, quote=True)}'>打开 Lighter 面板</a></nav>"

@@ -303,10 +303,25 @@ class RenderTests(unittest.TestCase):
         cfg = _cfg()
         html = render_page(self._store_with_mr_pos().summary(stale_after_s=180),
                            cfg.hl_panel_url, cfg.lt_panel_url)
-        self.assertIn("QQQ", html)
+        self.assertIn("QQQ·NDX", html)
         self.assertIn("多·MR", html)
         self.assertIn("28,580", html)   # 窄屏价格取整（≥1000 不留小数）
         self.assertNotIn("当前空仓", html)
+
+    def test_p2_content_dates_perf_and_legend(self):
+        """P2 内容：跨天成交带昨/日期前缀、HL MR 标 QQQ·NDX、LT 卡带结单统计、标的动态带折叠图例。"""
+        from app.views import _fmt_time
+        # 基准 2026-11-06 12:00 UTC (北京 20:00)
+        ref = 1793966400.0
+        self.assertEqual(_fmt_time(ref - 3600, ref), "19:00")          # 同日
+        self.assertEqual(_fmt_time(ref - 86400, ref), "昨 20:00")      # 昨天
+        self.assertEqual(_fmt_time(ref - 3 * 86400, ref), "11-03 20:00")  # 更早
+        cfg = _cfg()
+        html = render_page(_store_with_both().summary(stale_after_s=180),
+                           cfg.hl_panel_url, cfg.lt_panel_url)
+        txt = _text(html)
+        self.assertIn("结单 1 笔 · 胜率 0.0% · 累计平仓 -3.64 U", txt)
+        self.assertIn('<details class="leg"><summary>图例说明</summary>', html)
 
     def test_pnl_coloring_and_shared_columns(self):
         """P1 视觉：盈亏按正负着色、方向标记多绿空红、两卡共用固定列宽表结构。"""

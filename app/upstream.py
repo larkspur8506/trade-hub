@@ -166,6 +166,24 @@ def normalize_lt(
         for t in (records or {}).get("trades") or []
         if t.get("kind") in ("entry", "exit")
     ][:5]
+    # LT 实盘统计（/api/records 自带完整 exit 腿已实现盈亏与 trade_count；无 stop 距离故展示胜率与已实现盈亏，不强算 R）
+    raw_trades = (records or {}).get("trades") or []
+    exits = [
+        float(t["realized_pnl"])
+        for t in raw_trades
+        if t.get("kind") == "exit" and t.get("realized_pnl") is not None
+    ]
+    funds = (records or {}).get("funds") or {}
+    lt_perf = {
+        "n": len(exits),
+        "win_rate": (sum(1 for x in exits if x > 0) / len(exits)) if exits else None,
+        "realized_total": (
+            funds.get("realized_total")
+            if funds.get("realized_total") is not None
+            else (sum(exits) if exits else None)
+        ),
+        "trade_count": funds.get("trade_count"),
+    }
     symbols_out = [
         {
             "symbol": s.get("symbol"),
@@ -201,6 +219,7 @@ def normalize_lt(
             for e in ev[:5]
         ],
         "trades": trades,
+        "perf": lt_perf,
         # MR 腿（QQQ）：面板 `status.mr` 原样透传，聚合页只读不改（2026-11-02）
         "mr": st.get("mr"),
         "degraded_parts": list(degraded_parts or []),
