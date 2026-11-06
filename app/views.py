@@ -19,57 +19,88 @@ _STALE_WARN_S = 600  # data older than 10 min gets an amber banner even if ok
 
 _CSS = """
 :root{
-  --bg:#12151a; --card:#1a1f27; --line:#2a323d; --fg:#e8ecf1; --dim:#8b97a5;
-  --ok:#3fb96f; --warn:#d9a13b; --bad:#e05555; --accent:#5b9dd9; --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#0f1216; --card:#181d24; --line:#262e38; --fg:#e8ecf1; --dim:#8b97a5; --faint:#5f6b78;
+  --ok:#3fb96f; --warn:#d9a13b; --bad:#e05555; --accent:#5b9dd9;
+  --up:#2fbf71; --down:#ef5b5b; --up-bg:rgba(47,191,113,.13); --down-bg:rgba(239,91,91,.13);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
   color-scheme: dark light;
 }
 @media (prefers-color-scheme: light){
-  :root{ --bg:#f5f7fa; --card:#ffffff; --line:#dde3ea; --fg:#1c2430; --dim:#62707f; }
+  :root{ --bg:#f3f5f8; --card:#ffffff; --line:#e3e8ee; --fg:#1c2430; --dim:#62707f; --faint:#98a3af;
+         --up:#16a35a; --down:#d93f3f; --up-bg:rgba(22,163,90,.10); --down-bg:rgba(217,63,63,.10); }
 }
 *{box-sizing:border-box}
 html,body{max-width:100%;overflow-x:hidden}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Noto Sans CJK SC",sans-serif;padding:12px;overscroll-behavior-y:contain}
-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
-header h1{font-size:17px;margin:0}
-header .gen{font-size:12px;color:var(--dim)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
-.card h2{font-size:15px;margin:0 0 6px;display:flex;align-items:center;gap:7px}
-.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
-.dot.ok{background:var(--ok)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--font);padding:12px;overscroll-behavior-y:contain;
+  font-variant-numeric:tabular-nums;-webkit-text-size-adjust:100%}
+header{display:flex;justify-content:space-between;align-items:center;margin:2px 2px 12px}
+header h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.2px}
+header .gen{font-size:12px;color:var(--dim);padding:3px 8px;border-radius:999px;border:1px solid var(--line);cursor:pointer}
+header .gen.old{color:var(--warn);border-color:var(--warn)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.card h2{font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:7px;font-weight:650}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+.dot.ok{background:var(--ok);box-shadow:0 0 0 3px rgba(63,185,111,.18)}
+.dot.warn{background:var(--warn);box-shadow:0 0 0 3px rgba(217,161,59,.18)}
+.dot.bad{background:var(--bad);box-shadow:0 0 0 3px rgba(224,85,85,.18)}
 .sub{font-size:12px;color:var(--dim);margin-bottom:8px}
-.big{font-family:var(--mono);font-size:19px;margin:2px 0 10px}
-.big .upnl{font-size:13px;margin-left:8px}
+.sub .mark{color:var(--accent)}
+.big{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;margin:6px 0 12px}
+.big .eq{font-size:24px;font-weight:650;letter-spacing:-.3px}
+.big .lbl{font-size:12px;color:var(--dim);font-weight:400;margin-right:4px;letter-spacing:0}
+.big .u{font-size:13px;color:var(--dim);font-weight:400;margin-left:2px}
+.upnl{font-size:13px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--line)}
+.upnl.up{color:var(--up);background:var(--up-bg)} .upnl.down{color:var(--down);background:var(--down-bg)}
+.up{color:var(--up)} .down{color:var(--down)}
 .tbl{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.pos{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0 10px;table-layout:auto}
-.pos th{color:var(--dim);font-weight:500;text-align:right;padding:3px 4px;border-bottom:1px solid var(--line)}
-.pos td{text-align:right;padding:4px;font-family:var(--mono);border-bottom:1px solid var(--line)}
+.pos{width:100%;border-collapse:collapse;font-size:13px;margin:0 0 10px;table-layout:fixed}
+.pos col.c0{width:21%} .pos col.c1{width:14%}
+.pos th{color:var(--faint);font-weight:500;font-size:11.5px;text-align:right;padding:4px 4px 5px;border-bottom:1px solid var(--line);white-space:nowrap}
+.pos td{text-align:right;padding:6px 4px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pos tr:last-child td{border-bottom:none}
 .pos th:first-child,.pos td:first-child{text-align:left}
-.pos td:first-child{font-family:inherit}
-.pos .mark{color:var(--ok)}
+.pos th:first-child,.pos td:first-child{padding-left:0} .pos th:last-child,.pos td:last-child{padding-right:0}
+.pos td:first-child{font-weight:600}
+.pos .mark{font-weight:500;font-size:.92em}
+.pos .mark.long,.act.long{color:var(--up)} .pos .mark.short,.act.short{color:var(--down)}
 .pos .miss{color:var(--bad)}
-.sym{font-size:13px;padding:5px 0;border-bottom:1px solid var(--line)}
+.sym{font-size:13px;padding:7px 0;border-bottom:1px solid var(--line);font-weight:600}
 .sym:last-child{border-bottom:none}
-.sym .v{color:var(--dim)}
+.sym .v{color:var(--dim);font-weight:400}
 .sym .mark{color:var(--accent)}
-.ev{font-size:12px;color:var(--dim);padding:3px 0;overflow-wrap:anywhere}
-.ev .t{font-family:var(--mono);margin-right:6px}
-.banner{font-size:12px;border-radius:6px;padding:6px 8px;margin:6px 0}
+.sec{font-size:11px;color:var(--faint);margin:4px 0 2px;letter-spacing:.3px}
+.ev{display:flex;align-items:baseline;gap:8px;font-size:12.5px;color:var(--fg);padding:4px 0;border-top:1px dashed var(--line);white-space:nowrap}
+.ev .t{color:var(--faint);flex:none;min-width:2.9em}
+.ev .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.ev .tx .q{color:var(--dim)}
+.ev .pl{flex:none;font-weight:600}
+.act{font-weight:600}
+.perf{font-size:12px;color:var(--dim);margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.banner{font-size:12px;border-radius:8px;padding:6px 9px;margin:6px 0}
 .banner.err{background:rgba(224,85,85,.12);color:var(--bad)}
 .banner.warn{background:rgba(217,161,59,.12);color:var(--warn)}
-.links{display:flex;gap:10px;margin:14px 0}
-.links a{flex:1;text-align:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:11px 0;color:var(--fg);text-decoration:none;font-size:14px}
+.links{display:flex;gap:10px;margin:14px 0 6px}
+.links a{flex:1;text-align:center;background:transparent;border:1px solid var(--accent);border-radius:12px;padding:11px 0;color:var(--accent);text-decoration:none;font-size:14px;font-weight:600}
+.links a:active{background:rgba(91,157,217,.12)}
 .init{color:var(--dim);font-size:13px;padding:8px 0}
-/* 窄屏（iPhone 竖屏）：7 列表格在 390px 内放不下，压字号+字距，仍溢出就在卡内横滑，
+/* 窄屏（iPhone 竖屏）：7 列表格固定列宽在 390px 内放下，仍溢出就在卡内横滑，
    不让整页产生横向滚动（2026-11-02 用户反馈「破窗」）。 */
 @media (max-width:480px){
-  body{padding:8px;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"PingFang SC","Noto Sans CJK SC",sans-serif}
-  .card{padding:10px}
-  .pos{font-size:11px;margin:4px 0 8px}
-  .pos th{padding:3px 2px;font-size:10.5px}
-  .pos td{padding:3px 2px}
-  .big{font-size:17px}
+  body{padding:8px;font-size:14px}
+  .card{padding:12px 10px}
+  .big .eq{font-size:22px}
+  .pos{font-size:11.5px}
+  .pos th{padding:3px 2px 4px;font-size:10.5px}
+  .pos td{padding:5px 2px}
+  .ev{font-size:12px;gap:6px}
   .sym{font-size:12px;letter-spacing:-0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .ev{overflow-wrap:anywhere}
+}
+/* 更窄（iPhone SE/mini 360-375px）：再压一档，保证价格数字不被省略号截断 */
+@media (max-width:380px){
+  .pos{font-size:10.5px;letter-spacing:-0.3px}
+  .pos col.c0{width:19%} .pos col.c1{width:13%}
+  .pos th{font-size:10px}
+  .pos td{padding:5px 1px}
 }
 """
 
@@ -83,7 +114,10 @@ _JS = (
     "if(hint&&dy>40&&dy<=70){hint.textContent='松手刷新…';}"
     "if(dy>70&&window.scrollY<=0){pulling=false;location.reload();}},{passive:true});"
     "document.addEventListener('touchend',function(){pulling=false;if(hint)hint.textContent=hint.dataset.t||hint.textContent;},{passive:true});"
-    "if(hint){hint.dataset.t=hint.textContent;hint.addEventListener('click',function(){location.reload();});}})();"
+    "if(hint){hint.dataset.t=hint.textContent;hint.addEventListener('click',function(){location.reload();});"
+    # 页面开着不刷新（PWA 挂后台回来）超过 2 分钟，「更新」时间变琥珀提示
+    "var ck=function(){var ts=+hint.dataset.ts||0;hint.classList.toggle('old',ts>0&&Date.now()/1000-ts>120);};"
+    "ck();setInterval(ck,15000);document.addEventListener('visibilitychange',ck);}})();"
 )
 
 _HEAD_LINKS = (
@@ -132,6 +166,32 @@ def _fmt_signed(v, nd: int = 2, suffix: str = "") -> str:
         return esc(v)
     sign = "+" if f >= 0 else ""
     return f"{sign}{_fmt_num(f, nd)}{suffix}"
+
+
+def _sign_cls(v) -> str:
+    """盈亏着色：>0 up（绿）、<0 down（红）、0/缺数不着色。"""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return ""
+    if f > 0:
+        return "up"
+    if f < 0:
+        return "down"
+    return ""
+
+
+def _pnl_span(v, suffix: str = "") -> str:
+    cls = _sign_cls(v)
+    inner = _fmt_signed(v) + suffix
+    return f'<span class="{cls}">{inner}</span>' if cls else inner
+
+
+def _side_mark(side_text, extra: str = "") -> str:
+    """持仓方向小标记：多绿空红（仓位方向，与成交行的开/平多空同色系）。"""
+    t = str(side_text or "")
+    cls = "long" if t.startswith("多") else ("short" if t.startswith("空") else "")
+    return f"<span class='mark {cls}'>{esc(t)}{extra}</span>" if t else ""
 
 
 def _fmt_pct(v, nd: int = 1) -> str:
@@ -193,7 +253,7 @@ def _held_text(side) -> str | None:
 def _stop_cell(covered: bool, price) -> str:
     """止损列只放价格（加标记会把行顶成两行）；缺止损才红字提示。"""
     if covered:
-        return _fmt_money(price)
+        return _fmt_px(price)
     return "<span class='miss'>无</span>"
 
 
@@ -223,8 +283,9 @@ def _total_upnl(base, mr_upnl):
 def _equity_line(equity, upnl) -> str:
     upnl_html = ""
     if upnl is not None:
-        upnl_html = f'<span class="upnl">浮盈 {_fmt_signed(upnl)} U</span>'
-    return f'<div class="big">权益 {_fmt_money(equity)} U{upnl_html}</div>'
+        upnl_html = f'<span class="upnl {_sign_cls(upnl)}">浮盈 {_fmt_signed(upnl)} U</span>'
+    return (f'<div class="big"><span class="eq"><span class="lbl">权益</span>{_fmt_money(equity)}'
+            f'<span class="u">U</span></span>{upnl_html}</div>')
 
 
 def _mr_position_row(entry: dict | None) -> str | None:
@@ -239,11 +300,11 @@ def _mr_position_row(entry: dict | None) -> str | None:
         return None
     exit_px = pos.get("exit_line") or (mr.get("signal") or {}).get("exit_line")
     return (
-        "<tr><td>QQQ <span class='mark'>多·MR</span></td>"
+        f"<tr><td>QQQ {_side_mark('多', '·MR')}</td>"
         f"<td>{_fmt_qty(pos.get('qty'))}</td>"
         f"<td>{_fmt_px(pos.get('entry_price'))}</td>"
         f"<td>{_fmt_px(pos.get('mark'))}</td>"
-        f"<td>{_fmt_signed(pos.get('upnl'))}</td>"
+        f"<td>{_pnl_span(pos.get('upnl'))}</td>"
         f"<td>{_fmt_px(exit_px)}</td>"
         "<td>—</td></tr>"
     )
@@ -277,20 +338,19 @@ def _fmt_px(v) -> str:
     return _fmt_money(f)
 
 
-def _positions_table_hl(rows: list[str]) -> str:
-    return (
-        '<div class="tbl"><table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>浮盈U</th><th>离场</th><th>止损</th></tr>'
-        + "".join(rows)
-        + "</table></div>"
-    )
+_POS_HEAD = (
+    '<div class="tbl"><table class="pos"><colgroup><col class="c0"><col class="c1"><col><col><col><col><col></colgroup>'
+    "<tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>浮盈U</th><th>离场</th><th>止损</th></tr>"
+)
 
 
-def _positions_table_lt(rows: list[str]) -> str:
-    return (
-        '<div class="tbl"><table class="pos"><tr><th>标的</th><th>数量</th><th>入场</th><th>现价</th><th>浮盈U</th><th>离场</th><th>止损</th></tr>'
-        + "".join(rows)
-        + "</table></div>"
-    )
+def _positions_table(rows: list[str]) -> str:
+    """两卡共用一张表结构：固定列宽（table-layout:fixed），上下两卡列对齐可竖着比。"""
+    return _POS_HEAD + "".join(rows) + "</table></div>"
+
+
+_positions_table_hl = _positions_table
+_positions_table_lt = _positions_table
 
 
 _HL_DIR = {
@@ -305,14 +365,29 @@ def _hl_fill_lines(fills: list, n: int = 3) -> list[str]:
     lines = []
     for f in (fills or [])[:n]:
         act = _HL_DIR.get(f.get("dir") or "", f.get("dir") or "—")
-        pnl = ""
+        pnl = None
         if str(f.get("dir") or "").startswith("Close") and f.get("closed_pnl") is not None:
-            pnl = f"（{_fmt_signed(f.get('closed_pnl'))} U）"
-        lines.append(
-            f'<div class="ev"><span class="t">{_fmt_time(f.get("ts"))}</span>'
-            f"{esc(f.get('coin'))} {esc(act)} {_fmt_qty(f.get('sz'))} @ {_fmt_money(f.get('px'))}{pnl}</div>"
-        )
-    return lines or ['<div class="ev">暂无成交</div>']
+            pnl = f.get("closed_pnl")
+        lines.append(_trade_line(f.get("ts"), f.get("coin"), act, f.get("sz"), f.get("px"), pnl))
+    return _trades_block(lines)
+
+
+def _trade_line(ts, sym, act: str, qty, px, pnl) -> str:
+    """成交行：时间 | 标的 + 开/平多空（多绿空红）+ 数量 @ 价 | 平仓腿盈亏右对齐着色。"""
+    cls = "long" if act.endswith("多") else ("short" if act.endswith("空") else "")
+    pl = ""
+    if pnl is not None:
+        pl = f'<span class="{("pl " + _sign_cls(pnl)).strip()}">{_fmt_signed(pnl)} U</span>'
+    return (
+        f'<div class="ev"><span class="t">{_fmt_time(ts)}</span>'
+        f'<span class="tx">{esc(sym)} <span class="act {cls}">{esc(act)}</span> '
+        f'<span class="q">{_fmt_qty(qty)} @ {_fmt_money(px)}</span></span>{pl}</div>'
+    )
+
+
+def _trades_block(lines: list[str]) -> list[str]:
+    head = '<div class="sec">最近成交</div>'
+    return [head] + (lines or ['<div class="ev"><span class="tx">暂无成交</span></div>'])
 
 
 def _lt_trade_lines(trades: list, n: int = 3) -> list[str]:
@@ -324,15 +399,12 @@ def _lt_trade_lines(trades: list, n: int = 3) -> list[str]:
         side = t.get("side_text") or ""
         if is_exit:
             side = {"多": "空", "空": "多"}.get(side, side)
-        act = ("平" if is_exit else "开") + esc(side)
-        pnl = ""
-        if t.get("kind_text") == "离场" and t.get("realized_pnl") is not None:
-            pnl = f"（{_fmt_signed(t.get('realized_pnl'))} U）"
-        lines.append(
-            f'<div class="ev"><span class="t">{_fmt_time(t.get("ts"))}</span>'
-            f"{esc(t.get('symbol'))} {act} {_fmt_qty(t.get('qty'))} @ {_fmt_money(t.get('price'))}{pnl}</div>"
-        )
-    return lines or ['<div class="ev">暂无成交</div>']
+        act = ("平" if is_exit else "开") + str(side)
+        pnl = None
+        if is_exit and t.get("realized_pnl") is not None:
+            pnl = t.get("realized_pnl")
+        lines.append(_trade_line(t.get("ts"), t.get("symbol"), act, t.get("qty"), t.get("price"), pnl))
+    return _trades_block(lines)
 
 
 def _symbols_card(hl_entry: dict | None, lt_entry: dict | None) -> str:
@@ -556,11 +628,11 @@ def _hl_card(entry: dict | None) -> str:
         for p in positions:
             side = "多" if p.get("side") == 1 else ("空" if p.get("side") == -1 else "—")
             rows.append(
-                f"<tr><td>{esc(p.get('coin'))} {side}</td>"
+                f"<tr><td>{esc(p.get('coin'))} {_side_mark(side)}</td>"
                 f"<td>{_fmt_qty(p.get('size'))}</td>"
                 f"<td>{_fmt_px(p.get('entry_px'))}</td>"
                 f"<td>{_fmt_px(p.get('mark_px'))}</td>"
-                f"<td>{_fmt_signed(p.get('unrealized_pnl'))}</td>"
+                f"<td>{_pnl_span(p.get('unrealized_pnl'))}</td>"
                 f"<td>{_fmt_px(p.get('exit_px'))}</td>"
                 f"<td>{_stop_cell(bool(p.get('has_stop')), p.get('stop_px'))}</td></tr>"
             )
@@ -580,7 +652,8 @@ def _hl_card(entry: dict | None) -> str:
     perf = d.get("perf") or {}
     if perf.get("n"):
         body.append(
-            f'<div class="sub" style="margin-top:6px">实盘 {esc(perf.get("n"))} 笔 · 胜率 {_fmt_pct(perf.get("win_rate"))} · 均R {_fmt_signed(perf.get("avg_r"))} · 总R {_fmt_signed(perf.get("total_r"))}</div>'
+            f'<div class="perf">实盘 {esc(perf.get("n"))} 笔 · 胜率 {_fmt_pct(perf.get("win_rate"))}'
+            f' · 均R {_pnl_span(perf.get("avg_r"))} · 总R {_pnl_span(perf.get("total_r"))}</div>'
         )
     return _card_head("Hyperliquid", entry, "".join(body))
 
@@ -625,11 +698,11 @@ def _lt_card(entry: dict | None) -> str:
         rows = []
         for p in positions:
             rows.append(
-                f"<tr><td>{esc(p.get('symbol'))} {esc(p.get('side_text'))}</td>"
+                f"<tr><td>{esc(p.get('symbol'))} {_side_mark(p.get('side_text'))}</td>"
                 f"<td>{_fmt_qty(p.get('qty'))}</td>"
                 f"<td>{_fmt_px(p.get('entry_price'))}</td>"
                 f"<td>{_fmt_px(p.get('price'))}</td>"
-                f"<td>{_fmt_signed(p.get('upnl'))}</td>"
+                f"<td>{_pnl_span(p.get('upnl'))}</td>"
                 f"<td>{_fmt_px(p.get('exit_price'))}</td>"
                 f"<td>{'—' if p.get('no_stop') else _stop_cell(bool(p.get('stop_price')), p.get('stop_price'))}</td></tr>"
             )
@@ -648,11 +721,11 @@ def render_page(summary: dict, hl_panel_url: str, lt_panel_url: str) -> str:
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         "<meta name='apple-mobile-web-app-capable' content='yes'>"
         "<meta name='apple-mobile-web-app-title' content='trade-hub'>"
-        "<meta name='theme-color' content='#12151a'>"
+        "<meta name='theme-color' content='#0f1216'>"
         "<title>trade-hub</title>"
         f"{_HEAD_LINKS}"
         f"<style>{_CSS}</style></head><body>"
-        f"<header><h1>trade-hub</h1><span class='gen'>更新 {gen}</span></header>"
+        f"<header><h1>trade-hub</h1><span class='gen' data-ts='{int(summary.get('generated_at', time.time()))}'>更新 {gen}</span></header>"
         + _hl_card(summary.get("hl"))
         + _lt_card(summary.get("lt"))
         + _symbols_card(summary.get("hl"), summary.get("lt"))
