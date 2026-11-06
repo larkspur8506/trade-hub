@@ -54,14 +54,14 @@ header .gen.old{color:var(--warn);border-color:var(--warn)}
 .up{color:var(--up)} .down{color:var(--down)}
 .tbl{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .pos{width:100%;border-collapse:collapse;font-size:13px;margin:0 0 10px;table-layout:fixed}
-.pos col.c0{width:25%} .pos col.c1{width:14%}
-.pos th{color:var(--faint);font-weight:500;font-size:11.5px;text-align:right;padding:4px 4px 5px;border-bottom:1px solid var(--line);white-space:nowrap}
-.pos td{text-align:right;padding:6px 4px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pos col.c0{width:21%} .pos col.c1{width:13%}
+.pos th{color:var(--faint);font-weight:500;font-size:11.5px;text-align:right;padding:4px 3px 5px;border-bottom:1px solid var(--line);white-space:nowrap}
+.pos td{text-align:right;padding:6px 3px;border-bottom:1px solid var(--line);white-space:nowrap}
 .pos tr:last-child td{border-bottom:none}
 .pos th:first-child,.pos td:first-child{text-align:left}
 .pos th:first-child,.pos td:first-child{padding-left:0} .pos th:last-child,.pos td:last-child{padding-right:0}
-.pos td:first-child{font-weight:600;letter-spacing:-0.3px}
-.pos .mark{font-weight:500;font-size:.88em}
+.pos td:first-child{font-weight:600;letter-spacing:-0.4px}
+.pos .mark{font-weight:500;font-size:.86em}
 .pos .mark.long,.act.long{color:var(--up)} .pos .mark.short,.act.short{color:var(--down)}
 .pos .miss{color:var(--bad)}
 .sym{font-size:13px;padding:7px 0;border-bottom:1px solid var(--line);font-weight:600}
@@ -93,16 +93,16 @@ details.leg .lg b{color:var(--fg);font-weight:600}
   body{padding:8px;font-size:14px}
   .card{padding:12px 10px}
   .big .eq{font-size:22px}
-  .pos{font-size:11.5px}
-  .pos th{padding:3px 2px 4px;font-size:10.5px}
-  .pos td{padding:5px 2px}
+  .pos{font-size:11px;letter-spacing:-0.3px}
+  .pos th{padding:3px 1.5px 4px;font-size:10.5px;letter-spacing:0}
+  .pos td{padding:5px 1.5px}
   .ev{font-size:12px;gap:6px}
   .sym{font-size:12px;letter-spacing:-0.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
-/* 更窄（iPhone SE/mini 360-375px）：再压一档，保证价格数字不被省略号截断 */
+/* 更窄（iPhone SE/mini 360-375px）：再压一档，保证价格数字不溢出 */
 @media (max-width:380px){
-  .pos{font-size:10.5px;letter-spacing:-0.3px}
-  .pos col.c0{width:25%} .pos col.c1{width:13%}
+  .pos{font-size:10px;letter-spacing:-0.4px}
+  .pos col.c0{width:21%} .pos col.c1{width:13%}
   .pos th{font-size:10px}
   .pos td{padding:5px 1px}
 }
@@ -322,7 +322,7 @@ def _mr_position_row(entry: dict | None) -> str | None:
         return None
     exit_px = pos.get("exit_line") or (mr.get("signal") or {}).get("exit_line")
     return (
-        f"<tr><td>QQQ·NDX {_side_mark('多', '·MR')}</td>"
+        f"<tr><td>QQQ·NDX {_side_mark('多')}</td>"
         f"<td>{_fmt_qty(pos.get('qty'))}</td>"
         f"<td>{_fmt_px(pos.get('entry_price'))}</td>"
         f"<td>{_fmt_px(pos.get('mark'))}</td>"
