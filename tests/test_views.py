@@ -304,9 +304,11 @@ class RenderTests(unittest.TestCase):
         html = render_page(self._store_with_mr_pos().summary(stale_after_s=180),
                            cfg.hl_panel_url, cfg.lt_panel_url)
         self.assertIn("QQQ·NDX", html)
-        self.assertIn("多·MR", html)
+        self.assertIn("<span class='mark long'>多</span>", html)
         self.assertIn("28,580", html)   # 窄屏价格取整（≥1000 不留小数）
         self.assertNotIn("当前空仓", html)
+        # 持仓表 td 绝不能设 text-overflow:ellipsis（iOS SF Pro 字形偏宽会把价格裁成 28,5... / 695...）
+        self.assertNotIn("text-overflow:ellipsis}\n.pos tr", html)
 
     def test_p2_content_dates_perf_and_legend(self):
         """P2 内容：跨天成交带昨/日期前缀、HL MR 标 QQQ·NDX、LT 卡带结单统计、标的动态带折叠图例。"""
