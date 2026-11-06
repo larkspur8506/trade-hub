@@ -30,6 +30,8 @@ class TokenGateTests(unittest.TestCase):
         self.assertEqual(client.get("/?k=wrong").status_code, 401)
         self.assertEqual(client.get("/api/summary").status_code, 401)
         self.assertEqual(client.get("/api/summary?k=wrong").status_code, 401)
+        self.assertEqual(client.get("/api/fragment").status_code, 401)
+        self.assertEqual(client.get("/api/fragment?k=wrong").status_code, 401)
 
     def test_page_with_query_token_sets_cookie(self):
         client, _ = _client()
@@ -95,9 +97,27 @@ class StaticAssetsTests(unittest.TestCase):
             r = client.get(path)
             self.assertEqual(r.status_code, 200, path)
             self.assertEqual(r.headers["content-type"], ctype, path)
+            self.assertIn("max-age=604800", r.headers.get("cache-control", ""), path)
         m = client.get("/manifest.webmanifest").json()
         self.assertEqual(m["short_name"], "trade-hub")
         self.assertTrue(any(i["src"] == "/icon-512.png" for i in m["icons"]))
+
+    def test_fragment_endpoint_returns_cards_html(self):
+        import time as _time
+        from app.upstream import normalize_hl
+
+        st = SnapshotStore()
+        st.put("hl", True, _time.time(), normalize_hl(fixtures.hl_status()))
+        app = create_app(_cfg(poll_s=0), store=st, run_poller=False)
+        client = TestClient(app)
+        r = client.get("/api/fragment?k=hubtok")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.headers.get("cache-control"), "no-store")
+        d = r.json()
+        self.assertIn("ts", d)
+        self.assertIn("gen", d)
+        self.assertIn("Hyperliquid", d["html"])
+        self.assertIn("499.22", d["html"])
 
 
 class ConfigTests(unittest.TestCase):

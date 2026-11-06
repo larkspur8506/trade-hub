@@ -13,13 +13,14 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from . import upstream
 from .config import Config
 from .store import SnapshotStore
-from .views import render_page
+from .views import render_cards_fragment, render_page
 
 logger = logging.getLogger("trade-hub")
 
 _COOKIE = "hub_token"
 _STALE_FALLBACK_S = 180.0
 _STATIC = Path(__file__).resolve().parent / "static"
+_STATIC_HEADERS = {"Cache-Control": "public, max-age=604800"}
 
 
 def _authorized(request: Request, cfg: Config, k: str) -> bool:
@@ -74,28 +75,30 @@ def create_app(cfg: Config | None = None, store: SnapshotStore | None = None, ru
 
     @app.get("/apple-touch-icon.png")
     async def icon_apple() -> FileResponse:
-        return FileResponse(_STATIC / "apple-touch-icon.png", media_type="image/png")
+        return FileResponse(_STATIC / "apple-touch-icon.png", media_type="image/png", headers=_STATIC_HEADERS)
 
     @app.get("/favicon-32.png")
     async def icon_32() -> FileResponse:
-        return FileResponse(_STATIC / "favicon-32.png", media_type="image/png")
+        return FileResponse(_STATIC / "favicon-32.png", media_type="image/png", headers=_STATIC_HEADERS)
 
     @app.get("/favicon.ico")
     async def favicon() -> FileResponse:
-        return FileResponse(_STATIC / "favicon-32.png", media_type="image/png")
+        return FileResponse(_STATIC / "favicon-32.png", media_type="image/png", headers=_STATIC_HEADERS)
 
     @app.get("/icon-192.png")
     async def icon_192() -> FileResponse:
-        return FileResponse(_STATIC / "icon-192.png", media_type="image/png")
+        return FileResponse(_STATIC / "icon-192.png", media_type="image/png", headers=_STATIC_HEADERS)
 
     @app.get("/icon-512.png")
     async def icon_512() -> FileResponse:
-        return FileResponse(_STATIC / "icon-512.png", media_type="image/png")
+        return FileResponse(_STATIC / "icon-512.png", media_type="image/png", headers=_STATIC_HEADERS)
 
     @app.get("/manifest.webmanifest")
     async def manifest() -> FileResponse:
         return FileResponse(
-            _STATIC / "manifest.webmanifest", media_type="application/manifest+json"
+            _STATIC / "manifest.webmanifest",
+            media_type="application/manifest+json",
+            headers=_STATIC_HEADERS,
         )
 
     @app.get("/api/summary")
@@ -103,6 +106,13 @@ def create_app(cfg: Config | None = None, store: SnapshotStore | None = None, ru
         if not _authorized(request, cfg, k):
             return JSONResponse({"error": "unauthorized"}, status_code=401)
         return st.summary(stale_after_s=max(cfg.poll_s * 3, _STALE_FALLBACK_S))
+
+    @app.get("/api/fragment")
+    async def api_fragment(request: Request, k: str = ""):
+        if not _authorized(request, cfg, k):
+            return JSONResponse({"error": "unauthorized"}, status_code=401)
+        summary = st.summary(stale_after_s=max(cfg.poll_s * 3, _STALE_FALLBACK_S))
+        return JSONResponse(render_cards_fragment(summary), headers={"Cache-Control": "no-store"})
 
     @app.get("/", response_class=HTMLResponse)
     async def page(request: Request, k: str = ""):
